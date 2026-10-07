@@ -20,22 +20,27 @@ def formato_clp(valor):
 
 def leer_datos(conexion):
     cursor = conexion.cursor()
-
-    # Productos: el stock se obtiene con la FUNCION almacenada
-    cursor.execute("SELECT cod_producto, nombre, precio FROM PRODUCTO ORDER BY cod_producto")
-    productos = []
-    for codigo, nombre, precio in cursor.fetchall():
-        stock = cursor.callfunc("fn_stock_disponible", int, [codigo])
-        productos.append({"codigo": codigo, "nombre": nombre, "precio": precio, "stock": stock})
-
-    # Clientes: el total se obtiene con la función del PACKAGE
-    cursor.execute("SELECT id_cliente, nombre FROM CLIENTE ORDER BY id_cliente")
-    clientes = []
-    for id_cliente, nombre in cursor.fetchall():
-        total = cursor.callfunc("pkg_pedidos.fn_total_cliente", int, [id_cliente])
-        clientes.append({"id": id_cliente, "nombre": nombre, "total": total})
-
-    # Movimientos: los inserta el TRIGGER cada vez que se crea un pedido
+    # 1. Consulta todos los productos y calcula el stock con la FUNCION en un solo viaje
+    cursor.execute("""
+        SELECT cod_producto, nombre, precio, fn_stock_disponible(cod_producto) AS stock
+          FROM PRODUCTO
+         ORDER BY cod_producto
+    """)
+    productos = [
+        {"codigo": c, "nombre": n, "precio": p, "stock": s}
+        for c, n, p, s in cursor.fetchall()
+    ]
+    # 2. Consulta los clientes y el total con la función del PACKAGE en un solo viaje
+    cursor.execute("""
+        SELECT id_cliente, nombre, pkg_pedidos.fn_total_cliente(id_cliente) AS total
+          FROM CLIENTE
+         ORDER BY id_cliente
+    """)
+    clientes = [
+        {"id": i, "nombre": n, "total": t}
+        for i, n, t in cursor.fetchall()
+    ]
+    # 3. Movimientos de stock
     cursor.execute("""
         SELECT id_movimiento, cod_producto, cantidad, stock_resultante,
                id_pedido, TO_CHAR(fecha_mov, 'DD/MM/YYYY HH24:MI')
@@ -46,10 +51,8 @@ def leer_datos(conexion):
         {"id": m, "codigo": c, "cantidad": q, "stock": s, "pedido": p, "fecha": f}
         for m, c, q, s, p, f in cursor.fetchall()
     ]
-
     cursor.close()
     return {"productos": productos, "clientes": clientes, "movimientos": movimientos}
-
 
 @app.get("/")
 def inicio():

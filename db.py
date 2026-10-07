@@ -42,18 +42,27 @@ def usa_wallet():
     return os.path.isfile(os.path.join(WALLET_DIR, "tnsnames.ora"))
 
  # Conexion a base de datos
+_pool = None
 def conectar():
-
-    if usa_wallet():
-        return oracledb.connect(
-            user=USUARIO,
-            password=CLAVE,
-            dsn=DSN,
-            config_dir=WALLET_DIR,
-            wallet_location=WALLET_DIR,
-            wallet_password=WALLET_CLAVE,
-        )
-    return oracledb.connect(user=USUARIO, password=CLAVE, dsn=DSN)
+    """Abre o reutiliza una conexión del pool a la base de datos."""
+    global _pool
+    if _pool is None:
+        params = {
+            "user": USUARIO,
+            "password": CLAVE,
+            "dsn": DSN,
+            "min": 1,
+            "max": 4,
+            "increment": 1,
+        }
+        if usa_wallet():
+            params.update({
+                "config_dir": WALLET_DIR,
+                "wallet_location": WALLET_DIR,
+                "wallet_password": WALLET_CLAVE,
+            })
+        _pool = oracledb.create_pool(**params)
+    return _pool.acquire()
 
 # Limpieza de codigo de error
 def limpiar_mensaje(mensaje):
