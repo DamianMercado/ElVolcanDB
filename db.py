@@ -26,14 +26,18 @@ WALLET_CLAVE = os.getenv("ORACLE_WALLET_PASSWORD")
 # Carpeta wallet y busqueda de archivo
 WALLET_DIR = os.getenv("ORACLE_WALLET_DIR", os.path.join(CARPETA, "wallet"))
 
-
+# Variable ORACLE_WALLET_BASE64:
 WALLET_B64 = os.getenv("ORACLE_WALLET_BASE64")
-if WALLET_B64 and not os.path.exists(WALLET_DIR):
+if WALLET_B64 and not os.path.isfile(os.path.join(WALLET_DIR, "tnsnames.ora")):
     os.makedirs(WALLET_DIR, exist_ok=True)
     zip_bytes = base64.b64decode(WALLET_B64)
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
-        z.extractall(WALLET_DIR)
-        
+        for member in z.infolist():
+            nombre_archivo = os.path.basename(member.filename)
+            if nombre_archivo:  # Ignora nombres de carpetas vacías
+                destino = os.path.join(WALLET_DIR, nombre_archivo)
+                with z.open(member) as source, open(destino, "wb") as target:
+                    target.write(source.read())
 def usa_wallet():
     return os.path.isfile(os.path.join(WALLET_DIR, "tnsnames.ora"))
 
