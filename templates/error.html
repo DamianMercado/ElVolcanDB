@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>El Volcán · Sin conexión</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-interior">
+      <div class="marca">
+        <span class="marca-nombre">El Volcán</span>
+        <span class="marca-sub">Base de datos Oracle · PL/SQL</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="contenido estrecho">
+    <section class="tarjeta">
+      <div class="tarjeta-cabeza">
+        <h2>No se pudo conectar a Oracle</h2>
+        <span class="tag tag-error">ERROR</span>
+      </div>
+      <pre class="error-oracle">{{ mensaje }}</pre>
+
+      <h3>Datos que está usando db.py</h3>
+      <ul class="datos">
+        <li>Usuario: <b>{{ usuario }}</b></li>
+        <li>DSN / servicio: <b>{{ dsn }}</b></li>
+        <li>Wallet: <b>{{ 'encontrado en ' ~ wallet_dir if usa_wallet else 'NO encontrado (falta tnsnames.ora en ' ~ wallet_dir ~ ')' }}</b></li>
+      </ul>
+
+      <h3>Qué revisar</h3>
+      <ol class="revisar">
+        <li>Que el contenido del <b>Wallet_xxxx.zip</b> esté descomprimido dentro de la carpeta <code>wallet</code>.</li>
+        <li>Que el <b>DSN</b> sea uno de los nombres de <code>wallet/tnsnames.ora</code>, el mismo servicio que usas en SQL Developer.</li>
+        <li>Que <b>WALLET_CLAVE</b> sea la clave que pusiste al descargar el wallet (no la del usuario).</li>
+        <li>Que el <b>usuario y la clave</b> sean los mismos con los que entras en SQL Developer.</li>
+        <li>Que la base esté encendida: si es Always Free y no la usas hace días, entra a Oracle Cloud y presiona <b>Start</b>.</li>
+        <li>Si el error dice <code>ORA-00942</code> o <code>PLS-</code>, la conexión funciona pero faltan las tablas u objetos: ejecuta los dos scripts en SQL Developer.</li>
+      </ol>
+      <p><a class="boton" href="{{ url_for('inicio') }}">Reintentar</a></p>
+    </section>
+  </main>
+</body>
+</html>

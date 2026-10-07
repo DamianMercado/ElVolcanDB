@@ -1,0 +1,14 @@
+# Archivo de credenciales locales
+.env
+# Archivos de certificados y llaves de Oracle Wallet
+wallet/
+*.zip
+*.sso
+*.p12
+*.pem
+*.jks
+*.ora
+wallet_base64.txt
+# Archivos temporales de Python
+__pycache__/
+*.pyc

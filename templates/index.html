@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>El Volcán · Pedidos</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-interior">
+      <div class="marca">
+        <span class="marca-nombre">El Volcán</span>
+        <span class="marca-sub">Crea tu pedido</span>
+      </div>
+      <div class="conexion" title="Datos de db.py">
+        <span class="punto"></span>
+        Conectado como <b>{{ usuario }}</b> con
+        {% if usa_wallet %}<span class="chip">wallet</span>{% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="contenido">
+
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% for tipo, texto in mensajes %}
+        <div class="aviso aviso-{{ tipo }}" role="{{ 'alert' if tipo == 'error' else 'status' }}">{{ texto }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="rejilla">
+
+      <!-- 1. FUNCIÓN -->
+      <section class="tarjeta">
+        <div class="tarjeta-cabeza">
+          <h2>Productos y stock</h2>
+          <span class="tag tag-funcion">FUNCIÓN</span>
+        </div>
+        <p class="explica">El stock de cada fila lo devuelve <code>fn_stock_disponible(codigo)</code>.</p>
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Producto</th><th class="num">Precio</th><th class="num">Stock</th></tr>
+            </thead>
+            <tbody>
+              {% for p in productos %}
+              <tr class="{{ 'resaltado' if p.codigo == resaltar }}">
+                <td class="mono">{{ p.codigo }}</td>
+                <td>{{ p.nombre }}</td>
+                <td class="num">${{ p.precio | clp }}</td>
+                <td class="num"><b>{{ p.stock }}</b></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 2. PACKAGE + TRIGGER -->
+      <section class="tarjeta" id="pedido">
+        <div class="tarjeta-cabeza">
+          <h2>Crear pedido</h2>
+          <span class="tag tag-package">PACKAGE</span>
+          <span class="tag tag-trigger">TRIGGER</span>
+        </div>
+        <p class="explica">Llama a <code>pkg_pedidos.sp_crear_pedido</code>. Al insertarse el pedido, el trigger <code>trg_descuenta_stock</code> descuenta el stock solo.</p>
+
+        <form method="post" action="{{ url_for('crear_pedido') }}" class="formulario">
+          <label>Cliente
+            <select name="id_cliente">
+              {% for c in clientes %}<option value="{{ c.id }}">{{ c.id }} · {{ c.nombre }}</option>{% endfor %}
+            </select>
+          </label>
+          <label>Producto
+            <select name="codigo">
+              {% for p in productos %}<option value="{{ p.codigo }}"{% if p.codigo == resaltar %} selected{% endif %}>{{ p.codigo }} · {{ p.nombre }}</option>{% endfor %}
+            </select>
+          </label>
+          <label>Cantidad
+            <input type="number" name="cantidad" value="1" min="1" step="1" required>
+          </label>
+          <button type="submit" class="boton">Crear pedido</button>
+        </form>
+      </section>
+
+      <!-- 3. FUNCIÓN DEL PACKAGE -->
+      <section class="tarjeta">
+        <div class="tarjeta-cabeza">
+          <h2>Total comprado por cliente</h2>
+          <span class="tag tag-package">PACKAGE</span>
+        </div>
+        <p class="explica">Cada total lo calcula <code>pkg_pedidos.fn_total_cliente(id)</code>.</p>
+        <div class="tabla-scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Cliente</th><th class="num">Total</th></tr></thead>
+            <tbody>
+              {% for c in clientes %}
+              <tr>
+                <td class="mono">{{ c.id }}</td>
+                <td>{{ c.nombre }}</td>
+                <td class="num">${{ c.total | clp }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 4. LO QUE DEJÓ EL TRIGGER -->
+      <section class="tarjeta">
+        <div class="tarjeta-cabeza">
+          <h2>Movimientos de stock</h2>
+          <span class="tag tag-trigger">TRIGGER</span>
+        </div>
+        <p class="explica">Estas filas las insertó el trigger.</p>
+        {% if movimientos %}
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>N°</th><th>Producto</th><th class="num">Cant.</th><th class="num">Stock después</th><th class="num">Pedido</th><th>Fecha</th></tr>
+            </thead>
+            <tbody>
+              {% for m in movimientos %}
+              <tr>
+                <td class="mono">{{ m.id }}</td>
+                <td class="mono">{{ m.codigo }}</td>
+                <td class="num">{{ m.cantidad }}</td>
+                <td class="num">{{ m.stock }}</td>
+                <td class="num">{{ m.pedido }}</td>
+                <td class="fecha">{{ m.fecha }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="vacio">Todavía no hay movimientos. Crea un pedido y aparecerá aquí.</p>
+        {% endif %}
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="pie">Distribuidora de Gas El Volcán</footer>
+</body>
+</html>
