@@ -1,147 +1,166 @@
 """
-Aplicacion de consola que usa los objetos PL/SQL de Oracle:
+Aplicación de consola que usa la base de datos MongoDB (el_volcan_db):
 
-  - FUNCION  fn_stock_disponible       -> opcion 1
-  - PACKAGE  pkg_pedidos.sp_crear_pedido -> opcion 2
-  - PACKAGE  pkg_pedidos.fn_total_cliente -> opcion 3
-  - TRIGGER  trg_descuenta_stock       -> se ve en la opcion 4
+  - Opción 1: Ver productos y stock disponible (colección `productos`)
+  - Opción 2: Crear un pedido y descontar stock (`pedidos` + `movimientos_stock`)
+  - Opción 3: Total comprado por cliente (agregación sobre `pedidos`)
+  - Opción 4: Ver movimientos de stock (`movimientos_stock`)
+  - Opción 5: Ver vistas calculadas (`v_alerta_stock_critico`, `v_resumen_despacho_zonas`, `v_liquidacion_repartidores`)
 
 Uso:  python app.py
 """
 
 import sys
-import oracledb
+from datetime import datetime
+from pymongo.errors import PyMongoError
 import db
 
 
-# ---------------------------------------------------------------
-# 1. Usa la FUNCION fn_stock_disponible
-# ---------------------------------------------------------------
-def ver_productos(conexion):
-    cursor = conexion.cursor()
-    cursor.execute("SELECT cod_producto, nombre, precio FROM PRODUCTO ORDER BY cod_producto")
-    productos = cursor.fetchall()
-
-    print("\n  CODIGO  PRODUCTO                        PRECIO     STOCK")
-    print("  " + "-" * 56)
-
-    for codigo, nombre, precio in productos:
-        # Llamada a la funcion almacenada
-        stock = cursor.callfunc("fn_stock_disponible", int, [codigo])
-        print(f"  {codigo:<8}{nombre:<32}{precio:>7,}{stock:>10}")
-
-    cursor.close()
+def formatear_fecha(valor):
+    if isinstance(valor, datetime):
+        return valor.strftime("%d/%m/%Y %H:%M")
+    return str(valor or "")
 
 
 # ---------------------------------------------------------------
-# 2. Usa el PACKAGE (procedimiento) y dispara el TRIGGER
+# 1. Ver productos y stock disponible
 # ---------------------------------------------------------------
-def crear_pedido(conexion):
+def ver_productos(database):
+    productos = list(database.productos.find().sort("_id", 1))
+
+    print("\n  CODIGO  PRODUCTO                        RESIDENCIAL  COMERCIAL   STOCK")
+    print("  " + "-" * 72)
+
+    for p in productos:
+        codigo = p["_id"]
+        nombre = p.get("nombre", "")[:30]
+        precios = p.get("precios", {})
+        p_res = int(precios.get("RESIDENCIAL", 0))
+        p_com = int(precios.get("COMERCIAL", 0))
+        stock = db.fn_stock_disponible(database, codigo)
+        print(f"  {codigo:<8}{nombre:<32}${p_res:>10,}  ${p_com:>8,}{stock:>8}")
+
+
+# ---------------------------------------------------------------
+# 2. Crear pedido + descontar stock + registrar movimiento
+# ---------------------------------------------------------------
+def crear_pedido(database):
     try:
-        id_cliente = int(input("\n  ID del cliente (1, 2 o 3): "))
-        codigo = input("  Codigo del producto (ej. CL002): ").strip().upper()
+        id_cliente = int(input("\n  ID del cliente (1 al 6): "))
+        codigo = input("  Código del producto (ej. CL002): ").strip().upper()
         cantidad = int(input("  Cantidad: "))
     except ValueError:
-        print("  Debes escribir un numero valido.")
+        print("  Debes escribir un número válido.")
         return
-
-    cursor = conexion.cursor()
-    id_pedido = cursor.var(int)
 
     try:
-        cursor.callproc("pkg_pedidos.sp_crear_pedido",
-                        [id_cliente, codigo, cantidad, id_pedido])
-        conexion.commit()
-        print(f"\n  Pedido N° {id_pedido.getvalue()} creado correctamente.")
-        print("  El trigger ya descontó el stock automáticamente.")
-
-    except oracledb.DatabaseError as e:
-        conexion.rollback()
-        error, = e.args
-        # Los ORA-20001 a ORA-20999 son los errores que definimos nosotros
-        if 20001 <= error.code <= 20999:
-            print("\n  No se pudo crear el pedido:")
-            print(f"  {limpiar_mensaje(error.message)}")
-        else:
-            print(f"\n  Error de base de datos: {error.message}")
-
-    cursor.close()
+        id_pedido = db.sp_crear_pedido(database, id_cliente, codigo, cantidad)
+        print(f"\n  Pedido N° {id_pedido} creado correctamente en MongoDB.")
+        print("  Se descontó el stock y se registró el movimiento automáticamente.")
+    except db.ErrorNegocio as e:
+        print("\n  No se pudo crear el pedido:")
+        print(f"  {e.message}")
+    except PyMongoError as e:
+        print(f"\n  Error de base de datos MongoDB: {e}")
 
 
 # ---------------------------------------------------------------
-# 3. Usa la funcion del PACKAGE
+# 3. Total comprado por cliente
 # ---------------------------------------------------------------
-def total_por_cliente(conexion):
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id_cliente, nombre FROM CLIENTE ORDER BY id_cliente")
+def total_por_cliente(database):
+    clientes = list(database.clientes.find().sort("_id", 1))
 
-    print("\n  CLIENTE                          TOTAL COMPRADO")
-    print("  " + "-" * 48)
+    print("\n  ID  CLIENTE                                   TIPO          TOTAL COMPRADO")
+    print("  " + "-" * 74)
 
-    for id_cliente, nombre in cursor.fetchall():
-        total = cursor.callfunc("pkg_pedidos.fn_total_cliente", int, [id_cliente])
-        print(f"  {nombre:<32} $ {total:>12,}")
-
-    cursor.close()
+    for c in clientes:
+        cid = int(c["_id"])
+        nombre = c.get("nombre", "")[:38]
+        tipo = c.get("tipo_cliente", "RESIDENCIAL")
+        total = db.fn_total_cliente(database, cid)
+        print(f"  {cid:<4}{nombre:<42}{tipo:<14}$ {total:>12,}")
 
 
 # ---------------------------------------------------------------
-# 4. Muestra lo que dejo el TRIGGER
+# 4. Movimientos de stock
 # ---------------------------------------------------------------
-def ver_movimientos(conexion):
-    cursor = conexion.cursor()
-    cursor.execute("""
-        SELECT m.id_movimiento, m.cod_producto, m.cantidad,
-               m.stock_resultante, m.id_pedido,
-               TO_CHAR(m.fecha_mov, 'DD/MM/YYYY HH24:MI')
-          FROM MOVIMIENTO_STOCK m
-         ORDER BY m.id_movimiento DESC
-    """)
-    filas = cursor.fetchall()
+def ver_movimientos(database):
+    filas = list(database.movimientos_stock.find().sort("_id", -1))
 
     if not filas:
-        print("\n  Todavia no hay movimientos. Crea un pedido primero.")
-        cursor.close()
+        print("\n  Todavía no hay movimientos. Crea un pedido primero.")
         return
 
-    print("\n  Estos registros los creó el trigger, nadie los insertó a mano:\n")
-    print("   N°  PRODUCTO  CANT   STOCK DESPUES  PEDIDO   FECHA")
-    print("  " + "-" * 56)
-    for mov, producto, cant, stock, pedido, fecha in filas:
-        print(f"  {mov:>3}  {producto:<9}{cant:>4}{stock:>14}{pedido:>9}   {fecha}")
-
-    cursor.close()
+    print("\n   N°  PRODUCTO  TIPO      CANT   STOCK DESPUÉS  PEDIDO   FECHA")
+    print("  " + "-" * 68)
+    for m in filas:
+        mov = m["_id"]
+        prod = m.get("cod_producto", "")
+        tipo = m.get("tipo_mov", "EGRESO")
+        cant = m.get("cantidad", 0)
+        stock = m.get("stock_resultante", 0)
+        pedido = m.get("id_pedido", "-")
+        fecha = formatear_fecha(m.get("fecha_mov"))
+        print(f"  {mov:>3}  {prod:<10}{tipo:<9}{cant:>5}{stock:>15}{pedido:>9}   {fecha}")
 
 
 # ---------------------------------------------------------------
-def limpiar_mensaje(mensaje):
-    """Deja solo el texto del error, sin el codigo ORA ni el rastro."""
-    texto = mensaje.split("\n")[0]
-    if ":" in texto:
-        texto = texto.split(":", 1)[1].strip()
-    return texto
+# 5. Vistas calculadas (volcan_mongodb_setup.js)
+# ---------------------------------------------------------------
+def ver_vistas(database):
+    print("\n  [A] VISTA: v_alerta_stock_critico")
+    print("  " + "-" * 60)
+    alertas = list(database.v_alerta_stock_critico.find())
+    if not alertas:
+        print("  Sin productos en stock crítico.")
+    else:
+        for a in alertas:
+            print(
+                f"  {a.get('cod_producto', ''):<8} {a.get('nombre', ''):<34} "
+                f"Stock: {a.get('stock_actual')} (Crítico: {a.get('stock_critico')})"
+            )
+
+    print("\n  [B] VISTA: v_resumen_despacho_zonas")
+    print("  " + "-" * 60)
+    for z in database.v_resumen_despacho_zonas.find():
+        print(
+            f"  Zona {z['_id']} ({z.get('nombre_zona', '')}): "
+            f"Pedidos={z.get('total_pedidos', 0)} | "
+            f"Entregados={z.get('pedidos_entregados', 0)} | "
+            f"Pendientes={z.get('pedidos_pendientes', 0)} | "
+            f"Recaudado=${int(z.get('monto_recaudado', 0)):,}"
+        )
+
+    print("\n  [C] VISTA: v_liquidacion_repartidores")
+    print("  " + "-" * 60)
+    for r in database.v_liquidacion_repartidores.find():
+        print(
+            f"  {r.get('nombre', ''):<30} Camión: {r.get('patente_camion', ''):<10} "
+            f"Entregas: {r.get('entregas_realizadas', 0)} | "
+            f"Comisión: ${int(r.get('comision_total_clp', 0)):,}"
+        )
 
 
 def menu():
-    print("\n" + "=" * 48)
-    print("  DISTRIBUIDORA DE GAS EL VOLCAN")
-    print("=" * 48)
-    print("  1. Ver productos y stock      (funcion)")
-    print("  2. Crear un pedido            (package + trigger)")
-    print("  3. Total comprado por cliente (package)")
-    print("  4. Ver movimientos de stock   (los creo el trigger)")
+    print("\n" + "=" * 54)
+    print("  DISTRIBUIDORA DE GAS EL VOLCÁN (MongoDB)")
+    print("=" * 54)
+    print("  1. Ver productos y stock       (colección productos)")
+    print("  2. Crear un pedido             (pedidos + stock)")
+    print("  3. Total comprado por cliente  (agregación $group)")
+    print("  4. Ver movimientos de stock    (movimientos_stock)")
+    print("  5. Ver vistas de reportes      (v_alerta / zonas / repartidores)")
     print("  0. Salir")
-    return input("\n  Opcion: ").strip()
+    return input("\n  Opción: ").strip()
 
 
 def main():
     try:
-        conexion = db.conectar()
-    except oracledb.DatabaseError as e:
-        print("No se pudo conectar a Oracle.")
+        database = db.conectar()
+    except Exception as e:
+        print("No se pudo conectar a MongoDB.")
         print(f"   {e}")
-        print("\nRevisa los datos de conexion en db.py y que el wallet")
-        print("este descomprimido en la carpeta 'wallet'.")
+        print("\nRevisa la variable MONGO_URI en tu archivo .env")
         sys.exit(1)
 
     opciones = {
@@ -149,6 +168,7 @@ def main():
         "2": crear_pedido,
         "3": total_por_cliente,
         "4": ver_movimientos,
+        "5": ver_vistas,
     }
 
     while True:
@@ -157,11 +177,10 @@ def main():
             break
         accion = opciones.get(opcion)
         if accion:
-            accion(conexion)
+            accion(database)
         else:
-            print("  Opcion no valida.")
+            print("  Opción no válida.")
 
-    conexion.close()
     print("\n  Hasta luego.\n")
 
 

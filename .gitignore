@@ -1,0 +1,23 @@
+# Variables de entorno y credenciales locales (NUNCA subir a GitHub)
+.env
+*.env
+!.env.example
+!.env.example.env
+
+# Archivos temporales y caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Archivos antiguos de Oracle Wallet (por seguridad si existen localmente)
+wallet/
+*.zip
+*.sso
+*.p12
+*.pem
+*.jks
+*.ora
+wallet_base64.txt

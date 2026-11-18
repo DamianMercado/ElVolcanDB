@@ -1,0 +1,110 @@
+[
+  {
+    "_id": 1,
+    "rut": "14.521.890-2",
+    "nombre": "María Teresa Contreras",
+    "tipo_cliente": "RESIDENCIAL",
+    "telefono": "+56984120934",
+    "email": "mcontreras@correo.cl",
+    "direccion": {
+      "calle": "Av. Libertad 645, Chillán",
+      "comuna": "Chillán",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.1023, -36.6067]
+      }
+    },
+    "id_zona": 1,
+    "activo": true
+  },
+  {
+    "_id": 2,
+    "rut": "76.432.110-K",
+    "nombre": "Panadería y Pastelería San Martín Ltda.",
+    "tipo_cliente": "COMERCIAL",
+    "telefono": "+56977541209",
+    "email": "adquisiciones@panaderiasanmartin.cl",
+    "direccion": {
+      "calle": "Av. Collín 842, Chillán",
+      "comuna": "Chillán",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.1088, -36.6125]
+      }
+    },
+    "id_zona": 5,
+    "activo": true
+  },
+  {
+    "_id": 3,
+    "rut": "16.890.341-7",
+    "nombre": "Jorge Luis Sepúlveda",
+    "tipo_cliente": "RESIDENCIAL",
+    "telefono": "+56962318845",
+    "email": "jsepulveda@correo.cl",
+    "direccion": {
+      "calle": "Pasaje Los Volcanes 1230, Villa Doña Francisca",
+      "comuna": "Chillán Oriente",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.0785, -36.6091]
+      }
+    },
+    "id_zona": 2,
+    "activo": true
+  },
+  {
+    "_id": 4,
+    "rut": "12.309.455-1",
+    "nombre": "Rosa Elvira Riquelme",
+    "tipo_cliente": "RESIDENCIAL",
+    "telefono": "+56951129087",
+    "email": "rriquelme@correo.cl",
+    "direccion": {
+      "calle": "Camino a Las Trancas Km 12, Sector Los Pellines",
+      "comuna": "Pinto",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-71.8914, -36.6982]
+      }
+    },
+    "id_zona": 3,
+    "activo": true
+  },
+  {
+    "_id": 5,
+    "rut": "77.910.440-5",
+    "nombre": "Restaurante Fogón Sureño SpA",
+    "tipo_cliente": "COMERCIAL",
+    "telefono": "+56993401122",
+    "email": "contacto@fogonsureno.cl",
+    "direccion": {
+      "calle": "Arturo Prat 412, Bulnes",
+      "comuna": "Bulnes",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.2984, -36.7421]
+      }
+    },
+    "id_zona": 4,
+    "activo": true
+  },
+  {
+    "_id": 6,
+    "rut": "19.002.118-9",
+    "nombre": "Pedro Pablo Venegas",
+    "tipo_cliente": "RESIDENCIAL",
+    "telefono": "+56944102938",
+    "email": "pvenegas@correo.cl",
+    "direccion": {
+      "calle": "O'Higgins 910, Chillán Viejo",
+      "comuna": "Chillán Viejo",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.1315, -36.6228]
+      }
+    },
+    "id_zona": 2,
+    "activo": false
+  }
+]

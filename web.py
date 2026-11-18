@@ -1,15 +1,17 @@
+import os
 import threading
 import webbrowser
+from datetime import datetime
 
-import oracledb
 from flask import Flask, flash, redirect, render_template, request, url_for
+from pymongo.errors import PyMongoError
 
 import db
 
-PUERTO = 5000
+PUERTO = int(os.getenv("PORT", 5000))
 
 app = Flask(__name__)
-app.secret_key = "el-volcan-local"  # necesario para los mensajes (flash)
+app.secret_key = os.getenv("SECRET_KEY", "el-volcan-mongodb")
 
 
 @app.template_filter("clp")
@@ -18,64 +20,115 @@ def formato_clp(valor):
     return f"{int(valor):,}".replace(",", ".")
 
 
-def leer_datos(conexion):
-    cursor = conexion.cursor()
-    # 1. Consulta todos los productos y calcula el stock con la FUNCION en un solo viaje
-    cursor.execute("""
-        SELECT cod_producto, nombre, precio, fn_stock_disponible(cod_producto) AS stock
-          FROM PRODUCTO
-         ORDER BY cod_producto
-    """)
-    productos = [
-        {"codigo": c, "nombre": n, "precio": p, "stock": s}
-        for c, n, p, s in cursor.fetchall()
-    ]
-    # 2. Consulta los clientes y el total con la función del PACKAGE en un solo viaje
-    cursor.execute("""
-        SELECT id_cliente, nombre, pkg_pedidos.fn_total_cliente(id_cliente) AS total
-          FROM CLIENTE
-         ORDER BY id_cliente
-    """)
-    clientes = [
-        {"id": i, "nombre": n, "total": t}
-        for i, n, t in cursor.fetchall()
-    ]
-    # 3. Movimientos de stock
-    cursor.execute("""
-        SELECT id_movimiento, cod_producto, cantidad, stock_resultante,
-               id_pedido, TO_CHAR(fecha_mov, 'DD/MM/YYYY HH24:MI')
-          FROM MOVIMIENTO_STOCK
-         ORDER BY id_movimiento DESC
-    """)
+def formatear_fecha(valor):
+    if isinstance(valor, datetime):
+        return valor.strftime("%d/%m/%Y %H:%M")
+    return str(valor or "")
+
+
+def leer_datos(database):
+    # 1. Productos y stock (colección `productos`)
+    productos = []
+    for p in database.productos.find().sort("_id", 1):
+        precios = p.get("precios", {})
+        stock = int(p.get("stock_actual", 0))
+        critico = int(p.get("stock_critico", 10))
+        productos.append(
+            {
+                "codigo": p["_id"],
+                "nombre": p.get("nombre", ""),
+                "categoria": p.get("categoria", ""),
+                "precio": int(precios.get("RESIDENCIAL", 0)),
+                "precio_comercial": int(precios.get("COMERCIAL", 0)),
+                "stock": stock,
+                "stock_critico": critico,
+                "es_critico": stock <= critico,
+            }
+        )
+
+    # 2. Clientes y total comprado (colección `clientes` + agregación en `pedidos`)
+    clientes = []
+    for c in database.clientes.find().sort("_id", 1):
+        cid = int(c["_id"])
+        clientes.append(
+            {
+                "id": cid,
+                "rut": c.get("rut", ""),
+                "nombre": c.get("nombre", ""),
+                "tipo_cliente": c.get("tipo_cliente", "RESIDENCIAL"),
+                "activo": c.get("activo", True),
+                "total": db.fn_total_cliente(database, cid),
+            }
+        )
+
+    # 3. Movimientos de stock (colección `movimientos_stock`)
     movimientos = [
-        {"id": m, "codigo": c, "cantidad": q, "stock": s, "pedido": p, "fecha": f}
-        for m, c, q, s, p, f in cursor.fetchall()
+        {
+            "id": m["_id"],
+            "codigo": m.get("cod_producto", ""),
+            "tipo_mov": m.get("tipo_mov", "EGRESO"),
+            "cantidad": m.get("cantidad", 0),
+            "stock": m.get("stock_resultante", 0),
+            "pedido": m.get("id_pedido", "-"),
+            "fecha": formatear_fecha(m.get("fecha_mov")),
+        }
+        for m in database.movimientos_stock.find().sort("_id", -1)
     ]
-    cursor.close()
-    return {"productos": productos, "clientes": clientes, "movimientos": movimientos}
+
+    # 4. Vistas calculadas de volcan_mongodb_setup.js
+    try:
+        alertas_stock = list(database.v_alerta_stock_critico.find())
+    except PyMongoError:
+        alertas_stock = []
+
+    try:
+        resumen_zonas = list(database.v_resumen_despacho_zonas.find())
+    except PyMongoError:
+        resumen_zonas = []
+
+    try:
+        liquidacion_repartidores = list(database.v_liquidacion_repartidores.find())
+    except PyMongoError:
+        liquidacion_repartidores = []
+
+    return {
+        "productos": productos,
+        "clientes": clientes,
+        "movimientos": movimientos,
+        "alertas_stock": alertas_stock,
+        "resumen_zonas": resumen_zonas,
+        "liquidacion_repartidores": liquidacion_repartidores,
+    }
+
 
 @app.get("/")
 def inicio():
     try:
-        with db.conectar() as conexion:
-            datos = leer_datos(conexion)
-    except oracledb.Error as e:
-        error, = e.args
-        return render_template(
-            "error.html",
-            mensaje=getattr(error, "message", str(error)),
-            usuario=db.USUARIO,
-            dsn=db.DSN,
-            usa_wallet=db.usa_wallet(),
-            wallet_dir=db.WALLET_DIR,
-        ), 500
+        database = db.conectar()
+        datos = leer_datos(database)
+    except Exception as e:
+        usuario, _ = db.obtener_usuario_y_host()
+        return (
+            render_template(
+                "error.html",
+                mensaje=str(e),
+                usuario=usuario,
+                dsn=db.DSN,
+                mongo_uri=db.uri_enmascarada(),
+                mongo_db=db.MONGO_DB,
+                es_cloud=db.es_cloud(),
+            ),
+            500,
+        )
 
+    usuario, _ = db.obtener_usuario_y_host()
     return render_template(
         "index.html",
         **datos,
-        usuario=db.USUARIO,
+        usuario=usuario,
         dsn=db.DSN,
-        usa_wallet=db.usa_wallet(),
+        mongo_db=db.MONGO_DB,
+        es_cloud=db.es_cloud(),
         resaltar=request.args.get("resaltar", ""),
     )
 
@@ -92,28 +145,21 @@ def crear_pedido():
 
     resaltar = ""
     try:
-        with db.conectar() as conexion:
-            cursor = conexion.cursor()
-            id_pedido = cursor.var(int)
-            try:
-                cursor.callproc("pkg_pedidos.sp_crear_pedido",
-                                [id_cliente, codigo, cantidad, id_pedido])
-                conexion.commit()
-                flash(f"Pedido N° {id_pedido.getvalue()} creado. "
-                      f"El trigger descontó {cantidad} unidad(es) de {codigo} y registró el movimiento.", "ok")
-                resaltar = codigo
-            except oracledb.DatabaseError as e:
-                conexion.rollback()
-                error, = e.args
-                # ORA-20001 a ORA-20999: errores de negocio que lanza el package
-                if 20001 <= error.code <= 20999:
-                    flash(f"No se pudo crear el pedido (ORA-{error.code}): "
-                          f"{db.limpiar_mensaje(error.message)}", "error")
-                else:
-                    flash(f"Error de base de datos: {error.message}", "error")
-    except oracledb.Error as e:
-        error, = e.args
-        flash(f"No se pudo conectar a Oracle: {getattr(error, 'message', error)}", "error")
+        database = db.conectar()
+        try:
+            id_pedido = db.sp_crear_pedido(database, id_cliente, codigo, cantidad)
+            flash(
+                f"Pedido N° {id_pedido} creado en MongoDB. "
+                f"Se descontaron {cantidad} unidad(es) de {codigo} y se registró el movimiento de stock.",
+                "ok",
+            )
+            resaltar = codigo
+        except db.ErrorNegocio as e:
+            flash(f"No se pudo crear el pedido (ERR-{e.code}): {e.message}", "error")
+        except PyMongoError as e:
+            flash(f"Error de validación o base de datos MongoDB: {e}", "error")
+    except Exception as e:
+        flash(f"No se pudo conectar a MongoDB: {e}", "error")
 
     destino = url_for("inicio", resaltar=resaltar) if resaltar else url_for("inicio")
     return redirect(destino + "#pedido")
@@ -122,10 +168,9 @@ def crear_pedido():
 if __name__ == "__main__":
     url = f"http://localhost:{PUERTO}"
     print("=" * 52)
-    print("  EL VOLCAN - version web")
+    print("  EL VOLCÁN - versión web (MongoDB)")
     print(f"  Abre {url} en tu navegador")
     print("  Para detenerlo cierra esta ventana o presiona Ctrl+C")
     print("=" * 52)
-    # Abre el navegador solo, un segundo después de arrancar
     threading.Timer(1.2, lambda: webbrowser.open(url)).start()
-    app.run(host="127.0.0.1", port=PUERTO, debug=False)
+    app.run(host="0.0.0.0", port=PUERTO, debug=False)

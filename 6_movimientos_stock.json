@@ -1,0 +1,79 @@
+[
+  {
+    "_id": 1,
+    "cod_producto": "CL002",
+    "tipo_mov": "EGRESO",
+    "cantidad": 1,
+    "stock_resultante": 199,
+    "id_pedido": 1001,
+    "fecha_mov": {
+      "$date": "2026-11-04T11:30:00.000Z"
+    }
+  },
+  {
+    "_id": 2,
+    "cod_producto": "MG003",
+    "tipo_mov": "EGRESO",
+    "cantidad": 2,
+    "stock_resultante": 198,
+    "id_pedido": 1001,
+    "fecha_mov": {
+      "$date": "2026-11-04T11:30:00.000Z"
+    }
+  },
+  {
+    "_id": 3,
+    "cod_producto": "CL004",
+    "tipo_mov": "EGRESO",
+    "cantidad": 3,
+    "stock_resultante": 27,
+    "id_pedido": 1002,
+    "fecha_mov": {
+      "$date": "2026-11-04T12:00:00.000Z"
+    }
+  },
+  {
+    "_id": 4,
+    "cod_producto": "RG002",
+    "tipo_mov": "EGRESO",
+    "cantidad": 1,
+    "stock_resultante": 11,
+    "id_pedido": 1002,
+    "fecha_mov": {
+      "$date": "2026-11-04T12:00:00.000Z"
+    }
+  },
+  {
+    "_id": 5,
+    "cod_producto": "CL003",
+    "tipo_mov": "EGRESO",
+    "cantidad": 2,
+    "stock_resultante": 88,
+    "id_pedido": 1003,
+    "fecha_mov": {
+      "$date": "2026-11-04T14:15:00.000Z"
+    }
+  },
+  {
+    "_id": 6,
+    "cod_producto": "CL003",
+    "tipo_mov": "EGRESO",
+    "cantidad": 4,
+    "stock_resultante": 84,
+    "id_pedido": 1004,
+    "fecha_mov": {
+      "$date": "2026-11-04T14:40:00.000Z"
+    }
+  },
+  {
+    "_id": 7,
+    "cod_producto": "MG004",
+    "tipo_mov": "EGRESO",
+    "cantidad": 1,
+    "stock_resultante": 24,
+    "id_pedido": 1004,
+    "fecha_mov": {
+      "$date": "2026-11-04T14:40:00.000Z"
+    }
+  }
+]

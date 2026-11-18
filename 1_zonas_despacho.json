@@ -1,0 +1,97 @@
+[
+  {
+    "_id": 1,
+    "nombre_zona": "Zona Centro",
+    "comunas_descripcion": "Chillán (sectores centro, norte y sur)",
+    "comunas": ["Chillán Centro", "Chillán Norte", "Chillán Sur"],
+    "dias_despacho_texto": "Lunes a Sábado",
+    "dias_despacho": ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"],
+    "horario": {
+      "hora_inicio": 8,
+      "hora_fin": 20,
+      "etiqueta": "08:00 – 20:00"
+    },
+    "ventana_estimada_horas": {
+      "horas_est_min": 1,
+      "horas_est_max": 3,
+      "etiqueta": "1 – 3 horas"
+    },
+    "comision_extra_clp": 0
+  },
+  {
+    "_id": 2,
+    "nombre_zona": "Zona Oriente",
+    "comunas_descripcion": "Chillán (sector oriente), Chillán Viejo",
+    "comunas": ["Chillán Oriente", "Chillán Viejo"],
+    "dias_despacho_texto": "Lunes a Viernes",
+    "dias_despacho": ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"],
+    "horario": {
+      "hora_inicio": 8,
+      "hora_fin": 18,
+      "etiqueta": "08:00 – 18:00"
+    },
+    "ventana_estimada_horas": {
+      "horas_est_min": 2,
+      "horas_est_max": 4,
+      "etiqueta": "2 – 4 horas"
+    },
+    "comision_extra_clp": 150
+  },
+  {
+    "_id": 3,
+    "nombre_zona": "Zona Rural",
+    "comunas_descripcion": "El Carmen, Pinto, San Ignacio",
+    "comunas": ["El Carmen", "Pinto", "San Ignacio"],
+    "dias_despacho_texto": "Martes y Jueves",
+    "dias_despacho": ["MARTES", "JUEVES"],
+    "horario": {
+      "hora_inicio": 8,
+      "hora_fin": 16,
+      "etiqueta": "08:00 – 16:00"
+    },
+    "ventana_estimada_horas": {
+      "horas_est_min": 3,
+      "horas_est_max": 6,
+      "etiqueta": "3 – 6 horas"
+    },
+    "comision_extra_clp": 400
+  },
+  {
+    "_id": 4,
+    "nombre_zona": "Zona Sur",
+    "comunas_descripcion": "Bulnes, Quillón",
+    "comunas": ["Bulnes", "Quillón"],
+    "dias_despacho_texto": "Miércoles",
+    "dias_despacho": ["MIERCOLES"],
+    "horario": {
+      "hora_inicio": 8,
+      "hora_fin": 16,
+      "etiqueta": "08:00 – 16:00"
+    },
+    "ventana_estimada_horas": {
+      "horas_est_min": 4,
+      "horas_est_max": 6,
+      "etiqueta": "4 – 6 horas"
+    },
+    "comision_extra_clp": 500
+  },
+  {
+    "_id": 5,
+    "nombre_zona": "Zona Comercial",
+    "comunas_descripcion": "Parques industriales y locales comerciales",
+    "comunas": ["Parque Industrial Chillán", "Zona Franca Comercial"],
+    "dias_despacho_texto": "Lunes a Viernes",
+    "dias_despacho": ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"],
+    "horario": {
+      "hora_inicio": 7,
+      "hora_fin": 17,
+      "etiqueta": "07:00 – 17:00"
+    },
+    "ventana_estimada_horas": {
+      "horas_est_min": 1,
+      "horas_est_max": 2,
+      "etiqueta": "Según agenda"
+    },
+    "comision_extra_clp": 250
+  }
+]

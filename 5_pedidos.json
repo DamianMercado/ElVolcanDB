@@ -1,0 +1,273 @@
+[
+  {
+    "_id": 1001,
+    "id_cliente": 1,
+    "id_repartidor": 1,
+    "id_zona": 1,
+    "fecha_pedido": {
+      "$date": "2026-11-04T11:30:00.000Z"
+    },
+    "fecha_entrega": {
+      "$date": "2026-11-04T12:45:00.000Z"
+    },
+    "estado": "ENTREGADO",
+    "entrega": {
+      "direccion_entrega": "Av. Libertad 645, Chillán",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.1023, -36.6067]
+      }
+    },
+    "lineas": [
+      {
+        "nro_linea": 1,
+        "cod_producto": "CL002",
+        "cantidad": 1,
+        "precio_unitario": 12000,
+        "subtotal": 12000
+      },
+      {
+        "nro_linea": 2,
+        "cod_producto": "MG003",
+        "cantidad": 2,
+        "precio_unitario": 990,
+        "subtotal": 1980
+      }
+    ],
+    "total": 13980,
+    "pago": {
+      "id_pago": 1,
+      "monto": 13980,
+      "medio_pago": "EFECTIVO",
+      "fecha_pago": {
+        "$date": "2026-11-04T12:45:00.000Z"
+      }
+    },
+    "auditoria": [
+      {
+        "id_auditoria": 1,
+        "estado_anterior": null,
+        "estado_nuevo": "PENDIENTE",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T11:30:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 2,
+        "estado_anterior": "PENDIENTE",
+        "estado_nuevo": "ASIGNADO",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T11:35:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 3,
+        "estado_anterior": "ASIGNADO",
+        "estado_nuevo": "EN_CAMINO",
+        "usuario_bd": "repartidor_1",
+        "fecha_cambio": {
+          "$date": "2026-11-04T12:15:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 4,
+        "estado_anterior": "EN_CAMINO",
+        "estado_nuevo": "ENTREGADO",
+        "usuario_bd": "repartidor_1",
+        "fecha_cambio": {
+          "$date": "2026-11-04T12:45:00.000Z"
+        }
+      }
+    ]
+  },
+  {
+    "_id": 1002,
+    "id_cliente": 2,
+    "id_repartidor": 1,
+    "id_zona": 5,
+    "fecha_pedido": {
+      "$date": "2026-11-04T12:00:00.000Z"
+    },
+    "fecha_entrega": {
+      "$date": "2026-11-04T13:20:00.000Z"
+    },
+    "estado": "ENTREGADO",
+    "entrega": {
+      "direccion_entrega": "Av. Collín 842, Chillán",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.1088, -36.6125]
+      }
+    },
+    "lineas": [
+      {
+        "nro_linea": 1,
+        "cod_producto": "CL004",
+        "cantidad": 3,
+        "precio_unitario": 40000,
+        "subtotal": 120000
+      },
+      {
+        "nro_linea": 2,
+        "cod_producto": "RG002",
+        "cantidad": 1,
+        "precio_unitario": 17000,
+        "subtotal": 17000
+      }
+    ],
+    "total": 137000,
+    "pago": {
+      "id_pago": 2,
+      "monto": 137000,
+      "medio_pago": "TRANSFERENCIA",
+      "fecha_pago": {
+        "$date": "2026-11-04T13:20:00.000Z"
+      }
+    },
+    "auditoria": [
+      {
+        "id_auditoria": 5,
+        "estado_anterior": null,
+        "estado_nuevo": "PENDIENTE",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T12:00:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 6,
+        "estado_anterior": "PENDIENTE",
+        "estado_nuevo": "ASIGNADO",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T12:10:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 7,
+        "estado_anterior": "ASIGNADO",
+        "estado_nuevo": "EN_CAMINO",
+        "usuario_bd": "repartidor_1",
+        "fecha_cambio": {
+          "$date": "2026-11-04T12:55:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 8,
+        "estado_anterior": "EN_CAMINO",
+        "estado_nuevo": "ENTREGADO",
+        "usuario_bd": "repartidor_1",
+        "fecha_cambio": {
+          "$date": "2026-11-04T13:20:00.000Z"
+        }
+      }
+    ]
+  },
+  {
+    "_id": 1003,
+    "id_cliente": 3,
+    "id_repartidor": 2,
+    "id_zona": 2,
+    "fecha_pedido": {
+      "$date": "2026-11-04T14:15:00.000Z"
+    },
+    "fecha_entrega": null,
+    "estado": "EN_CAMINO",
+    "entrega": {
+      "direccion_entrega": "Pasaje Los Volcanes 1230, Villa Doña Francisca",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.0785, -36.6091]
+      }
+    },
+    "lineas": [
+      {
+        "nro_linea": 1,
+        "cod_producto": "CL003",
+        "cantidad": 2,
+        "precio_unitario": 16000,
+        "subtotal": 32000
+      }
+    ],
+    "total": 32000,
+    "pago": null,
+    "auditoria": [
+      {
+        "id_auditoria": 9,
+        "estado_anterior": null,
+        "estado_nuevo": "PENDIENTE",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T14:15:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 10,
+        "estado_anterior": "PENDIENTE",
+        "estado_nuevo": "ASIGNADO",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T14:20:00.000Z"
+        }
+      },
+      {
+        "id_auditoria": 11,
+        "estado_anterior": "ASIGNADO",
+        "estado_nuevo": "EN_CAMINO",
+        "usuario_bd": "repartidor_2",
+        "fecha_cambio": {
+          "$date": "2026-11-04T14:38:00.000Z"
+        }
+      }
+    ]
+  },
+  {
+    "_id": 1004,
+    "id_cliente": 5,
+    "id_repartidor": null,
+    "id_zona": 4,
+    "fecha_pedido": {
+      "$date": "2026-11-04T14:40:00.000Z"
+    },
+    "fecha_entrega": null,
+    "estado": "PENDIENTE",
+    "entrega": {
+      "direccion_entrega": "Arturo Prat 412, Bulnes",
+      "ubicacion": {
+        "type": "Point",
+        "coordinates": [-72.2984, -36.7421]
+      }
+    },
+    "lineas": [
+      {
+        "nro_linea": 1,
+        "cod_producto": "CL003",
+        "cantidad": 4,
+        "precio_unitario": 14500,
+        "subtotal": 58000
+      },
+      {
+        "nro_linea": 2,
+        "cod_producto": "MG004",
+        "cantidad": 1,
+        "precio_unitario": 11500,
+        "subtotal": 11500
+      }
+    ],
+    "total": 69500,
+    "pago": null,
+    "auditoria": [
+      {
+        "id_auditoria": 12,
+        "estado_anterior": null,
+        "estado_nuevo": "PENDIENTE",
+        "usuario_bd": "operadora_llamadas",
+        "fecha_cambio": {
+          "$date": "2026-11-04T14:40:00.000Z"
+        }
+      }
+    ]
+  }
+]

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>El Volcán · Pedidos</title>
+  <title>El Volcán · MongoDB</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
@@ -11,12 +11,12 @@
     <div class="barra-interior">
       <div class="marca">
         <span class="marca-nombre">El Volcán</span>
-        <span class="marca-sub">Crea tu pedido</span>
+        <span class="marca-sub">MongoDB · {{ mongo_db }}</span>
       </div>
       <div class="conexion" title="Datos de db.py">
         <span class="punto"></span>
-        Conectado como <b>{{ usuario }}</b> con
-        {% if usa_wallet %}<span class="chip">wallet</span>{% endif %}
+        Conectado como <b>{{ usuario }}</b> en <b>{{ dsn }}</b>
+        {% if es_cloud %}<span class="chip">MongoDB Atlas Cloud</span>{% else %}<span class="chip">MongoDB Compass Local</span>{% endif %}
       </div>
     </div>
   </header>
@@ -31,17 +31,17 @@
 
     <div class="rejilla">
 
-      <!-- 1. FUNCIÓN -->
+      <!-- 1. PRODUCTOS Y STOCK -->
       <section class="tarjeta">
         <div class="tarjeta-cabeza">
           <h2>Productos y stock</h2>
-          <span class="tag tag-funcion">FUNCIÓN</span>
+          <span class="tag tag-funcion">COLECCIÓN</span>
         </div>
-        <p class="explica">El stock de cada fila lo devuelve <code>fn_stock_disponible(codigo)</code>.</p>
+        <p class="explica">Colección <code>productos</code> con validación <code>$jsonSchema</code> y precios diferenciados.</p>
         <div class="tabla-scroll">
           <table>
             <thead>
-              <tr><th>Código</th><th>Producto</th><th class="num">Precio</th><th class="num">Stock</th></tr>
+              <tr><th>Código</th><th>Producto</th><th class="num">Residencial</th><th class="num">Comercial</th><th class="num">Stock</th></tr>
             </thead>
             <tbody>
               {% for p in productos %}
@@ -49,6 +49,7 @@
                 <td class="mono">{{ p.codigo }}</td>
                 <td>{{ p.nombre }}</td>
                 <td class="num">${{ p.precio | clp }}</td>
+                <td class="num">${{ p.precio_comercial | clp }}</td>
                 <td class="num"><b>{{ p.stock }}</b></td>
               </tr>
               {% endfor %}
@@ -57,19 +58,19 @@
         </div>
       </section>
 
-      <!-- 2. PACKAGE + TRIGGER -->
+      <!-- 2. CREAR PEDIDO -->
       <section class="tarjeta" id="pedido">
         <div class="tarjeta-cabeza">
           <h2>Crear pedido</h2>
-          <span class="tag tag-package">PACKAGE</span>
-          <span class="tag tag-trigger">TRIGGER</span>
+          <span class="tag tag-package">$JSONSCHEMA</span>
+          <span class="tag tag-trigger">STOCK AUTO</span>
         </div>
-        <p class="explica">Llama a <code>pkg_pedidos.sp_crear_pedido</code>. Al insertarse el pedido, el trigger <code>trg_descuenta_stock</code> descuenta el stock solo.</p>
+        <p class="explica">Valida esquema en <code>pedidos</code>, aplica tarifa según tipo de cliente, descuenta stock en <code>productos</code> e inserta en <code>movimientos_stock</code>.</p>
 
         <form method="post" action="{{ url_for('crear_pedido') }}" class="formulario">
           <label>Cliente
             <select name="id_cliente">
-              {% for c in clientes %}<option value="{{ c.id }}">{{ c.id }} · {{ c.nombre }}</option>{% endfor %}
+              {% for c in clientes %}<option value="{{ c.id }}">{{ c.id }} · {{ c.nombre }} ({{ c.tipo_cliente }}{% if not c.activo %} - INACTIVO{% endif %})</option>{% endfor %}
             </select>
           </label>
           <label>Producto
@@ -84,21 +85,22 @@
         </form>
       </section>
 
-      <!-- 3. FUNCIÓN DEL PACKAGE -->
+      <!-- 3. TOTAL COMPRADO POR CLIENTE -->
       <section class="tarjeta">
         <div class="tarjeta-cabeza">
           <h2>Total comprado por cliente</h2>
-          <span class="tag tag-package">PACKAGE</span>
+          <span class="tag tag-package">AGREGACIÓN</span>
         </div>
-        <p class="explica">Cada total lo calcula <code>pkg_pedidos.fn_total_cliente(id)</code>.</p>
+        <p class="explica">Calculado mediante pipeline <code>$match</code> + <code>$group</code> sobre la colección <code>pedidos</code>.</p>
         <div class="tabla-scroll">
           <table>
-            <thead><tr><th>ID</th><th>Cliente</th><th class="num">Total</th></tr></thead>
+            <thead><tr><th>ID</th><th>Cliente</th><th>Tipo</th><th class="num">Total</th></tr></thead>
             <tbody>
               {% for c in clientes %}
               <tr>
                 <td class="mono">{{ c.id }}</td>
                 <td>{{ c.nombre }}</td>
+                <td class="mono">{{ c.tipo_cliente }}</td>
                 <td class="num">${{ c.total | clp }}</td>
               </tr>
               {% endfor %}
@@ -107,13 +109,13 @@
         </div>
       </section>
 
-      <!-- 4. LO QUE DEJÓ EL TRIGGER -->
+      <!-- 4. MOVIMIENTOS DE STOCK -->
       <section class="tarjeta">
         <div class="tarjeta-cabeza">
           <h2>Movimientos de stock</h2>
-          <span class="tag tag-trigger">TRIGGER</span>
+          <span class="tag tag-trigger">AUDITORÍA</span>
         </div>
-        <p class="explica">Estas filas las insertó el trigger.</p>
+        <p class="explica">Documentos en <code>movimientos_stock</code> indexados por <code>idx_mov_prod_fecha</code>.</p>
         {% if movimientos %}
         <div class="tabla-scroll">
           <table>
@@ -139,9 +141,85 @@
         {% endif %}
       </section>
 
+      <!-- 5. VISTA: RESUMEN DE DESPACHO POR ZONAS -->
+      <section class="tarjeta">
+        <div class="tarjeta-cabeza">
+          <h2>Resumen de despacho por zonas</h2>
+          <span class="tag tag-funcion">VISTA MONGODB</span>
+        </div>
+        <p class="explica">Vista calculada <code>v_resumen_despacho_zonas</code> (<code>$lookup</code> entre <code>zonas_despacho</code> y <code>pedidos</code>).</p>
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Zona</th><th>Sectores / Comunas</th><th class="num">Entregados</th><th class="num">Pendientes</th><th class="num">Recaudado</th></tr>
+            </thead>
+            <tbody>
+              {% for z in resumen_zonas %}
+              <tr>
+                <td><b>{{ z.nombre_zona }}</b></td>
+                <td>{{ z.comunas_descripcion }}</td>
+                <td class="num">{{ z.pedidos_entregados }}</td>
+                <td class="num">{{ z.pedidos_pendientes }}</td>
+                <td class="num">${{ z.monto_recaudado | clp }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 6. VISTAS: LIQUIDACIÓN REPARTIDORES + ALERTA STOCK CRÍTICO -->
+      <section class="tarjeta">
+        <div class="tarjeta-cabeza">
+          <h2>Liquidación repartidores y alertas</h2>
+          <span class="tag tag-funcion">VISTA MONGODB</span>
+        </div>
+        <p class="explica">Vistas <code>v_liquidacion_repartidores</code> y <code>v_alerta_stock_critico</code>.</p>
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Repartidor</th><th>Camión</th><th class="num">Entregas</th><th class="num">Comisión Total</th></tr>
+            </thead>
+            <tbody>
+              {% for r in liquidacion_repartidores %}
+              <tr>
+                <td>{{ r.nombre }}</td>
+                <td class="mono">{{ r.patente_camion }}</td>
+                <td class="num">{{ r.entregas_realizadas }}</td>
+                <td class="num">${{ r.comision_total_clp | clp }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Alerta de stock crítico (<code>v_alerta_stock_critico</code>)</h3>
+        {% if alertas_stock %}
+        <div class="tabla-scroll">
+          <table>
+            <thead>
+              <tr><th>Código</th><th>Producto</th><th class="num">Stock Actual</th><th class="num">Stock Crítico</th></tr>
+            </thead>
+            <tbody>
+              {% for a in alertas_stock %}
+              <tr class="resaltado">
+                <td class="mono">{{ a.cod_producto }}</td>
+                <td>{{ a.nombre }}</td>
+                <td class="num"><b>{{ a.stock_actual }}</b></td>
+                <td class="num">{{ a.stock_critico }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="vacio">No hay productos bajo el stock crítico.</p>
+        {% endif %}
+      </section>
+
     </div>
   </main>
 
-  <footer class="pie">Distribuidora de Gas El Volcán</footer>
+  <footer class="pie">Distribuidora de Gas El Volcán · MongoDB NoSQL Híbrido</footer>
 </body>
 </html>

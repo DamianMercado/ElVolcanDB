@@ -1,0 +1,47 @@
+[
+  {
+    "_id": 1,
+    "rut": "15.678.234-1",
+    "nombre": "Carlos Alberto Muñoz",
+    "patente_camion": "KJ-WP-42",
+    "id_zona_base": 1,
+    "activo": true,
+    "ubicacion_actual": {
+      "type": "Point",
+      "coordinates": [-72.1045, -36.6078]
+    },
+    "ultima_actualizacion_gps": {
+      "$date": "2026-11-04T14:40:00.000Z"
+    }
+  },
+  {
+    "_id": 2,
+    "rut": "17.982.410-6",
+    "nombre": "Héctor Patricio Sandoval",
+    "patente_camion": "LP-RT-88",
+    "id_zona_base": 2,
+    "activo": true,
+    "ubicacion_actual": {
+      "type": "Point",
+      "coordinates": [-72.0812, -36.6104]
+    },
+    "ultima_actualizacion_gps": {
+      "$date": "2026-11-04T14:42:00.000Z"
+    }
+  },
+  {
+    "_id": 3,
+    "rut": "18.450.119-3",
+    "nombre": "Rodrigo Andrés Garrido",
+    "patente_camion": "KJ-WP-42",
+    "id_zona_base": 3,
+    "activo": true,
+    "ubicacion_actual": {
+      "type": "Point",
+      "coordinates": [-71.9120, -36.6850]
+    },
+    "ultima_actualizacion_gps": {
+      "$date": "2026-11-04T14:35:00.000Z"
+    }
+  }
+]

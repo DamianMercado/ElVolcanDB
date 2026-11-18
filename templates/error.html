@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>El Volcán · Sin conexión</title>
+  <title>El Volcán · Sin conexión a MongoDB</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <div class="barra-interior">
       <div class="marca">
         <span class="marca-nombre">El Volcán</span>
-        <span class="marca-sub">Base de datos Oracle · PL/SQL</span>
+        <span class="marca-sub">Base de datos MongoDB · NoSQL</span>
       </div>
     </div>
   </header>
@@ -19,26 +19,28 @@
   <main class="contenido estrecho">
     <section class="tarjeta">
       <div class="tarjeta-cabeza">
-        <h2>No se pudo conectar a Oracle</h2>
+        <h2>No se pudo conectar a MongoDB</h2>
         <span class="tag tag-error">ERROR</span>
       </div>
       <pre class="error-oracle">{{ mensaje }}</pre>
 
       <h3>Datos que está usando db.py</h3>
       <ul class="datos">
-        <li>Usuario: <b>{{ usuario }}</b></li>
-        <li>DSN / servicio: <b>{{ dsn }}</b></li>
-        <li>Wallet: <b>{{ 'encontrado en ' ~ wallet_dir if usa_wallet else 'NO encontrado (falta tnsnames.ora en ' ~ wallet_dir ~ ')' }}</b></li>
+        <li>Modo: <b>{{ 'MongoDB Atlas (Cloud Gratis M0)' if es_cloud else 'MongoDB Local (Compass)' }}</b></li>
+        <li>URI: <b><code>{{ mongo_uri }}</code></b></li>
+        <li>Base de datos: <b><code>{{ mongo_db }}</code></b></li>
       </ul>
 
       <h3>Qué revisar</h3>
       <ol class="revisar">
-        <li>Que el contenido del <b>Wallet_xxxx.zip</b> esté descomprimido dentro de la carpeta <code>wallet</code>.</li>
-        <li>Que el <b>DSN</b> sea uno de los nombres de <code>wallet/tnsnames.ora</code>, el mismo servicio que usas en SQL Developer.</li>
-        <li>Que <b>WALLET_CLAVE</b> sea la clave que pusiste al descargar el wallet (no la del usuario).</li>
-        <li>Que el <b>usuario y la clave</b> sean los mismos con los que entras en SQL Developer.</li>
-        <li>Que la base esté encendida: si es Always Free y no la usas hace días, entra a Oracle Cloud y presiona <b>Start</b>.</li>
-        <li>Si el error dice <code>ORA-00942</code> o <code>PLS-</code>, la conexión funciona pero faltan las tablas u objetos: ejecuta los dos scripts en SQL Developer.</li>
+        <li>Verifica que hayas creado el archivo <code>.env</code> (a partir de <code>.env.example.env</code>) con tu variable <code>MONGO_URI</code>.</li>
+        <li>Si usas <b>MongoDB Atlas (Cloud Gratis)</b>:
+          <ul>
+            <li>Asegúrate de haber reemplazado <code>&lt;usuario&gt;</code> y <code>&lt;password&gt;</code> en <code>MONGO_URI</code>.</li>
+            <li>En MongoDB Atlas → <b>Network Access</b>, agrega la IP <code>0.0.0.0/0</code> (Allow Access from Anywhere) para que funcione desde tu PC y desde Render.</li>
+          </ul>
+        </li>
+        <li>Si usas <b>MongoDB Compass Local</b> (<code>mongodb://localhost:27017/</code>), verifica que el servicio local de MongoDB Server esté iniciado.</li>
       </ol>
       <p><a class="boton" href="{{ url_for('inicio') }}">Reintentar</a></p>
     </section>

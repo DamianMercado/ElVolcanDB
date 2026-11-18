@@ -1,0 +1,202 @@
+[
+  {
+    "_id": "CL001",
+    "categoria": "Cilindros de Gas",
+    "es_cilindro": true,
+    "formato_kg": 5,
+    "nombre": "Cilindro GLP 5 kg",
+    "descripcion": "Cilindro de gas licuado de petróleo 5 kg. Para uso residencial (cocina, calefacción pequeña).",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 6500,
+      "COMERCIAL": 6000
+    },
+    "stock_actual": 80,
+    "stock_critico": 10
+  },
+  {
+    "_id": "CL002",
+    "categoria": "Cilindros de Gas",
+    "es_cilindro": true,
+    "formato_kg": 11,
+    "nombre": "Cilindro GLP 11 kg",
+    "descripcion": "Cilindro estándar doméstico. El más utilizado en hogares chilenos. Compatible con reguladores estándar.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 12000,
+      "COMERCIAL": 11000
+    },
+    "stock_actual": 200,
+    "stock_critico": 10
+  },
+  {
+    "_id": "CL003",
+    "categoria": "Cilindros de Gas",
+    "es_cilindro": true,
+    "formato_kg": 15,
+    "nombre": "Cilindro GLP 15 kg",
+    "descripcion": "Cilindro de mayor capacidad para hogares de alto consumo o locales pequeños.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 16000,
+      "COMERCIAL": 14500
+    },
+    "stock_actual": 90,
+    "stock_critico": 10
+  },
+  {
+    "_id": "CL004",
+    "categoria": "Cilindros de Gas",
+    "es_cilindro": true,
+    "formato_kg": 45,
+    "nombre": "Cilindro GLP 45 kg",
+    "descripcion": "Cilindro industrial. Uso comercial: restaurantes, talleres, calefacción de locales.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 45000,
+      "COMERCIAL": 40000
+    },
+    "stock_actual": 30,
+    "stock_critico": 10
+  },
+  {
+    "_id": "RG001",
+    "categoria": "Reguladores",
+    "es_cilindro": false,
+    "nombre": "Regulador doméstico estándar",
+    "descripcion": "Regulador de 1 etapa para cilindros 5, 11 y 15 kg. Presión de salida 28 mbar.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 8990,
+      "COMERCIAL": 8200
+    },
+    "stock_actual": 45,
+    "stock_critico": 10
+  },
+  {
+    "_id": "RG002",
+    "categoria": "Reguladores",
+    "es_cilindro": false,
+    "nombre": "Regulador de alta presión",
+    "descripcion": "Regulador para cocinas industriales o equipos de mayor consumo. Presión regulable.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 18990,
+      "COMERCIAL": 17000
+    },
+    "stock_actual": 12,
+    "stock_critico": 10
+  },
+  {
+    "_id": "RG003",
+    "categoria": "Reguladores",
+    "es_cilindro": false,
+    "nombre": "Regulador dual (2 salidas)",
+    "descripcion": "Permite conectar dos artefactos simultáneamente al mismo cilindro.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 14990,
+      "COMERCIAL": 13500
+    },
+    "stock_actual": 18,
+    "stock_critico": 10
+  },
+  {
+    "_id": "MG001",
+    "categoria": "Mangueras y Conexiones",
+    "es_cilindro": false,
+    "nombre": "Manguera gas 1.5 m",
+    "descripcion": "Manguera flexible homologada. Diámetro interior 9mm. Compatible con reguladores estándar.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 3990,
+      "COMERCIAL": 3500
+    },
+    "stock_actual": 80,
+    "stock_critico": 10
+  },
+  {
+    "_id": "MG002",
+    "categoria": "Mangueras y Conexiones",
+    "es_cilindro": false,
+    "nombre": "Manguera gas 3 m",
+    "descripcion": "Manguera larga para instalaciones donde el artefacto está alejado del cilindro.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 6990,
+      "COMERCIAL": 6200
+    },
+    "stock_actual": 50,
+    "stock_critico": 10
+  },
+  {
+    "_id": "MG003",
+    "categoria": "Mangueras y Conexiones",
+    "es_cilindro": false,
+    "nombre": "Abrazadera metálica",
+    "descripcion": "Abrazadera de acero para asegurar la conexión manguera-regulador y manguera-artefacto.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 990,
+      "COMERCIAL": 800
+    },
+    "stock_actual": 200,
+    "stock_critico": 10
+  },
+  {
+    "_id": "MG004",
+    "categoria": "Mangueras y Conexiones",
+    "es_cilindro": false,
+    "nombre": "Kit conexión completo (regulador + manguera 1.5m + abrazaderas)",
+    "descripcion": "Todo lo necesario para instalar un cilindro nuevo.",
+    "unidad": "Kit",
+    "precios": {
+      "RESIDENCIAL": 12990,
+      "COMERCIAL": 11500
+    },
+    "stock_actual": 25,
+    "stock_critico": 10
+  },
+  {
+    "_id": "AC001",
+    "categoria": "Accesorios",
+    "es_cilindro": false,
+    "nombre": "Carro porta cilindro 11/15 kg",
+    "descripcion": "Carro metálico con ruedas para transportar cilindros dentro del hogar con seguridad.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 12990,
+      "COMERCIAL": 11000
+    },
+    "stock_actual": 20,
+    "stock_critico": 10
+  },
+  {
+    "_id": "AC002",
+    "categoria": "Accesorios",
+    "es_cilindro": false,
+    "nombre": "Tapa protectora para válvula",
+    "descripcion": "Tapa de plástico ABS para proteger la válvula del cilindro durante el transporte.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 1490,
+      "COMERCIAL": 1200
+    },
+    "stock_actual": 60,
+    "stock_critico": 10
+  },
+  {
+    "_id": "AC003",
+    "categoria": "Accesorios",
+    "es_cilindro": false,
+    "nombre": "Detector de gas a batería",
+    "descripcion": "Sensor electroquímico. Alarma sonora y visual ante fuga de gas GLP o metano.",
+    "unidad": "Unidad",
+    "precios": {
+      "RESIDENCIAL": 19990,
+      "COMERCIAL": 17000
+    },
+    "stock_actual": 8,
+    "stock_critico": 10
+  }
+]
