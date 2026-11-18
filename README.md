@@ -30,11 +30,11 @@ ElVolcanDB/
 4. En **Network Access**, haz clic en **Add IP Address** y selecciona **Allow Access from Anywhere (`0.0.0.0/0`)** (necesario para que Render y tu PC puedan conectarse).
 5. Haz clic en **Connect** → **Drivers** (o **Compass**) y copia tu cadena de conexión:
    ```
-   mongodb+srv://volcan_user:TuClave123@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+   mongodb+srv://<usuario>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
    ```
 6. Crea un archivo llamado `.env` en la raíz del proyecto con:
    ```env
-   MONGO_URI=mongodb+srv://volcan_user:TuClave123@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+   MONGO_URI=mongodb+srv://<usuario>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority
    MONGO_DB=el_volcan_db
    AUTO_SEED_MONGODB=true
    ```
