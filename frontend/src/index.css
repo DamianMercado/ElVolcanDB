@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --color-volcan-primary: #0A2540;
+  --color-volcan-accent: #FF4500;
+  --color-volcan-accent-hover: #E03D00;
+  --color-volcan-secondary: #00A8E8;
+  --color-volcan-bg: #F7F9FC;
+  --color-volcan-text: #1A1D20;
+  --color-admin-blue: #2358b9;
+  --color-admin-blue-hover: #1b4794;
+  --color-status-ok: #1bd124;
+  --color-status-warn: #f9a825;
+  --color-status-crit: #d84315;
+}
+
+@layer base {
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
+    background-color: var(--color-volcan-bg);
+    color: var(--color-volcan-text);
+    font-family: var(--font-sans);
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+@keyframes destello-esqueleto {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.esqueleto-gris {
+  background-color: #cbd5e1;
+  background-image: linear-gradient(
+    110deg,
+    #cbd5e1 25%,
+    #e2e8f0 37%,
+    #cbd5e1 63%
+  );
+  background-size: 400% 100%;
+  animation: destello-esqueleto 1.4s ease infinite;
+}
+
+.esqueleto-oscuro {
+  background-color: #475569;
+  background-image: linear-gradient(
+    110deg,
+    #475569 25%,
+    #64748b 37%,
+    #475569 63%
+  );
+  background-size: 400% 100%;
+  animation: destello-esqueleto 1.4s ease infinite;
+}
+
+/* ==========================================================================
+   ESTILOS MAPA Y NAVEGACIÓN EN TIEMPO REAL (PALETA UBER)
+   Paleta: #ffffff (Blanco), #e7e8ec (Gris Claro), #adadad (Gris Medio),
+           #2171ec (Azul Uber), #121212 (Negro Carbón)
+   ========================================================================== */
+
+@import "leaflet/dist/leaflet.css";
+
+@keyframes pulso-halo-repartidor {
+  0% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(33, 113, 236, 0.8);
+  }
+  70% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 18px rgba(33, 113, 236, 0);
+  }
+  100% {
+    transform: scale(0.9);
+    box-shadow: 0 0 0 0 rgba(33, 113, 236, 0);
+  }
+}
+
+.anim-pulso-camion {
+  animation: pulso-halo-repartidor 2s infinite ease-out;
+}
+
+.pin-contenedor-camion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: #121212;
+  border: 3px solid #2171ec;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(18, 18, 18, 0.45);
+  transition: transform 0.4s ease;
+}
+
+.pin-contenedor-destino {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  background: #121212;
+  border: 3px solid #2171ec;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(18, 18, 18, 0.35);
+}
+
+.pin-contenedor-origen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #adadad;
+  color: #2171ec;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Filtro de estilo Uber para capas de mapa */
+.mapa-estilo-uber .leaflet-tile-pane {
+  filter: contrast(98%) brightness(101%);
+}
+
+/* Fallback OpenStreetMap en escala de grises limpia tipo Uber */
+.mapa-osm-uber .leaflet-tile-pane {
+  filter: grayscale(100%) contrast(92%) brightness(104%);
+}
+
+/* Leaflet container fixes */
+.leaflet-container {
+  font-family: inherit !important;
+  z-index: 10 !important;
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25) !important;
+  padding: 4px !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px !important;
+  line-height: 1.4 !important;
+}
+

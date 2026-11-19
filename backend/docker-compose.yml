@@ -1,0 +1,215 @@
+services:
+  # ==================== MONGODB (RESPALDO LOCAL / ATLAS CLOUD) ====================
+  # Si defines MONGO_URI=mongodb+srv://... en un archivo .env en esta carpeta,
+  # todos los microservicios se conectarán directamente a tu cluster de MongoDB Atlas.
+
+  mongodb:
+    image: mongo:7.0
+    container_name: elvolcan-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: el_volcan_db
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb/volcan_mongodb_setup.js:/docker-entrypoint-initdb.d/volcan_mongodb_setup.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - elvolcan-net
+
+  # ==================== EUREKA SERVER ====================
+
+  eureka-server:
+    build:
+      context: ./eureka-server
+      dockerfile: Dockerfile
+    container_name: elvolcan-eureka
+    ports:
+      - "8761:8761"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  # ==================== API GATEWAY ====================
+
+  gateway-service:
+    build:
+      context: ./gateway-service
+      dockerfile: Dockerfile
+    container_name: elvolcan-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  # ==================== MICROSERVICIOS (SPRING DATA MONGODB ATLAS) ====================
+
+  ms-usuario:
+    build:
+      context: ./ms-usuario
+      dockerfile: Dockerfile
+    container_name: elvolcan-usuario
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  ms-auth:
+    build:
+      context: ./ms-auth
+      dockerfile: Dockerfile
+    container_name: elvolcan-auth
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      ms-usuario:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  ms-inventario:
+    build:
+      context: ./ms-inventario
+      dockerfile: Dockerfile
+    container_name: elvolcan-inventario
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      ms-auth:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  ms-catalogo:
+    build:
+      context: ./ms-catalogo
+      dockerfile: Dockerfile
+    container_name: elvolcan-catalogo
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      ms-auth:
+        condition: service_started
+      ms-inventario:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  ms-venta:
+    build:
+      context: ./ms-venta
+      dockerfile: Dockerfile
+    container_name: elvolcan-venta
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      ms-auth:
+        condition: service_started
+      ms-catalogo:
+        condition: service_started
+      ms-inventario:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+  ms-pago:
+    build:
+      context: ./ms-pago
+      dockerfile: Dockerfile
+    container_name: elvolcan-pago
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      ms-auth:
+        condition: service_started
+      ms-venta:
+        condition: service_started
+    networks:
+      - elvolcan-net
+    restart: unless-stopped
+
+networks:
+  elvolcan-net:
+    driver: bridge
+
+volumes:
+  mongodb_data:

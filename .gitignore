@@ -1,23 +1,55 @@
-# Variables de entorno y credenciales locales (NUNCA subir a GitHub)
+# ============================================
+# Variables de entorno y credenciales sensibles
+# ============================================
 .env
 *.env
+*.env.local
+.env.*.local
 !.env.example
-!.env.example.env
+!.env.example.*
 
-# Archivos temporales y caché de Python
+# ============================================
+# Node / Frontend
+# ============================================
+**/node_modules/
+**/dist/
+frontend/dist/
+frontend/node_modules/
+
+# ============================================
+# Java / Maven / Backend
+# ============================================
+**/target/
+**/.flattened-pom.xml
+.mvn/wrapper/maven-wrapper.jar
+
+# ============================================
+# Logs
+# ============================================
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ============================================
+# IDEs y Sistemas Operativos
+# ============================================
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Python (legado)
+# ============================================
 __pycache__/
 *.py[cod]
-*$py.class
 .venv/
 venv/
-env/
-
-# Archivos antiguos de Oracle Wallet (por seguridad si existen localmente)
-wallet/
-*.zip
-*.sso
-*.p12
-*.pem
-*.jks
-*.ora
-wallet_base64.txt

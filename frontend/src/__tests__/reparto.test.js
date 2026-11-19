@@ -1,0 +1,96 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import {
+  obtenerEntregaActiva,
+  guardarEntregaActiva,
+  reiniciarEntregaDemo,
+  actualizarPosicionRepartidor,
+  cambiarEstadoEntrega,
+  calcularRumbo,
+  obtenerRutaOSRM,
+  ENTREGA_EJEMPLO,
+} from '../service/repartoService.js'
+
+describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('debe obtener la entrega activa por defecto si no hay nada guardado', () => {
+    const entrega = obtenerEntregaActiva()
+    expect(entrega).toBeDefined()
+    expect(entrega.id).toBe('EV-1024')
+    expect(entrega.cliente.nombre).toBe('Camila Soto Valenzuela')
+    expect(entrega.repartidor.nombre).toBe('Carlos Silva Morales')
+    expect(entrega.total).toBe(36490)
+    expect(entrega.items.length).toBeGreaterThan(0)
+  })
+
+  it('debe actualizar la posición del repartidor y persistirla', () => {
+    const nuevaPos = {
+      lat: -33.605,
+      lng: -70.577,
+      indicePunto: 4,
+      rumbo: 180,
+      distanciaRestanteKm: 1.5,
+      etaMinutos: 5,
+      velocidadKmH: 45,
+    }
+
+    const resultado = actualizarPosicionRepartidor(nuevaPos)
+    expect(resultado.posicionActual.lat).toBe(-33.605)
+    expect(resultado.posicionActual.lng).toBe(-70.577)
+    expect(resultado.posicionActual.indicePunto).toBe(4)
+    expect(resultado.distanciaKm).toBe(1.5)
+    expect(resultado.etaMinutos).toBe(5)
+
+    // Verificar lectura posterior
+    const lectura = obtenerEntregaActiva()
+    expect(lectura.posicionActual.lat).toBe(-33.605)
+  })
+
+  it('debe cambiar el estado de la entrega a llegando y entregado', () => {
+    const llegando = cambiarEstadoEntrega('llegando')
+    expect(llegando.estado).toBe('llegando')
+
+    const entregado = cambiarEstadoEntrega('entregado')
+    expect(entregado.estado).toBe('entregado')
+    expect(entregado.etaMinutos).toBe(0)
+    expect(entregado.distanciaKm).toBe(0)
+  })
+
+  it('debe reiniciar la entrega al estado de demostración inicial', () => {
+    cambiarEstadoEntrega('entregado')
+    expect(obtenerEntregaActiva().estado).toBe('entregado')
+
+    const reiniciado = reiniciarEntregaDemo()
+    expect(reiniciado.estado).toBe('en_camino')
+    expect(reiniciado.etaMinutos).toBe(9)
+    expect(reiniciado.distanciaKm).toBe(2.4)
+  })
+
+  it('debe calcular el rumbo angular entre dos coordenadas correctamente', () => {
+    // Rumbo hacia el sur (latitud decrece a longitud constante)
+    const rumboSur = calcularRumbo(-33.5, -70.5, -33.6, -70.5)
+    expect(Math.round(rumboSur)).toBe(180)
+
+    // Rumbo hacia el norte (latitud crece a longitud constante)
+    const rumboNorte = calcularRumbo(-33.6, -70.5, -33.5, -70.5)
+    expect(Math.round(rumboNorte)).toBe(0)
+  })
+
+  it('debe entregar ruta de fallback si el servicio OSRM no responde o falla', async () => {
+    // Simular error de red en fetch
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(new Error('Fallo simulado de red'))
+    )
+
+    const ruta = await obtenerRutaOSRM()
+    expect(ruta).toBeDefined()
+    expect(ruta.exito).toBe(false)
+    expect(ruta.puntos.length).toBeGreaterThan(5)
+    expect(ruta.pasos.length).toBeGreaterThan(0)
+    expect(ruta.distanciaKm).toBe(2.4)
+  })
+})
