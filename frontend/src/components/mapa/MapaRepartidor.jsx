@@ -13,17 +13,12 @@ import {
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || ''
 
 const obtenerUrlTiles = (modoOscuro = false) => {
-  if (CARTO_API_KEY) {
-    // Paleta Uber: light_all (Positron) para vista día (#ffffff / #e7e8ec / #adadad)
-    // dark_all (Dark Matter) para vista noche (#121212)
-    return modoOscuro
-      ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
-      : `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
-  }
-  // OpenStreetMap Oficial sin marcas de agua ni registro obligatorio
+  // Paleta Uber CartoDB: Positron día (#ffffff / #e7e8ec / #adadad) y Dark Matter noche (#121212)
+  // Libre y pública por defecto; si se define VITE_CARTO_API_KEY se incluye el parámetro key
+  const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
   return modoOscuro
-    ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-    : 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+    ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png${queryParam}`
+    : `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png${queryParam}`
 }
 
 const crearIconoCamion = (rumbo = 0) => {
@@ -119,7 +114,7 @@ export function MapaRepartidor({
 
     const capaTiles = L.tileLayer(urlTiles, {
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
       subdomains: 'abc',
     }).addTo(mapa)

@@ -9,12 +9,9 @@ import {
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || ''
 
 const obtenerUrlTilesCliente = () => {
-  if (CARTO_API_KEY) {
-    // Paleta Uber: light_all (Positron) (#ffffff / #e7e8ec / #adadad)
-    return `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
-  }
-  // OpenStreetMap Oficial sin marcas de agua
-  return 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+  // Paleta Uber CartoDB Positron: minimalista (#ffffff / #e7e8ec / #adadad) libre y pública por defecto
+  const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
+  return `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png${queryParam}`
 }
 
 const crearIconoCamionCliente = (rumbo = 0) => {
@@ -90,10 +87,10 @@ export function MapaSeguimientoCliente({ entrega }) {
       zoomControl: false,
     })
 
-    // OpenStreetMap / CartoDB si hay API Key
+    // Tile Layer: CartoDB Positron / OpenStreetMap
     L.tileLayer(obtenerUrlTilesCliente(), {
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
       subdomains: 'abc',
     }).addTo(mapa)

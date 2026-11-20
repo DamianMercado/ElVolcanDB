@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 @theme {
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -72,8 +73,6 @@
    Paleta: #ffffff (Blanco), #e7e8ec (Gris Claro), #adadad (Gris Medio),
            #2171ec (Azul Uber), #121212 (Negro Carbón)
    ========================================================================== */
-
-@import "leaflet/dist/leaflet.css";
 
 @keyframes pulso-halo-repartidor {
   0% {
