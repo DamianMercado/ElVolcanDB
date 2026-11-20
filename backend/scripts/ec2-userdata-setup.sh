@@ -14,6 +14,7 @@
 #   3. Instalación de Docker, Docker Compose v2, Git, Curl, Cron y tzdata
 #   4. Clonación del repositorio GitHub (si no existe todavía)
 #   5. Servicio systemd (elvolcan-docker.service) -> inicia Docker solo al prender EC2
+#      y sincroniza automáticamente la nueva IP pública de EC2 con Render y/o DuckDNS
 #   6. Cron diario a las 03:00 AM hora Santiago de Chile -> detecta cambios en GitHub
 #      y actualiza clon + reconstruye contenedores automáticamente
 #   7. Rotación automática de logs (logrotate)
@@ -81,6 +82,7 @@ fi
 
 git config --global --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 chmod +x "${REPO_DIR}/backend/scripts/ec2-autodeploy.sh"
+chmod +x "${REPO_DIR}/backend/scripts/ec2-sync-ip.sh"
 chmod +x "${REPO_DIR}/backend/scripts/ec2-userdata-setup.sh"
 
 # Si se pasaron variables por User Data, crear backend/.env automáticamente si no existe
@@ -93,6 +95,14 @@ JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026
 JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
 EUREKA_URL=http://eureka-server:8761/eureka/
 TZ=America/Santiago
+RENDER_API_KEY=${RENDER_API_KEY:-}
+RENDER_SERVICE_ID=${RENDER_SERVICE_ID:-}
+RENDER_API_ENV_KEY=${RENDER_API_ENV_KEY:-VITE_API_URL}
+PUBLIC_API_SCHEME=${PUBLIC_API_SCHEME:-http}
+PUBLIC_API_PORT=${PUBLIC_API_PORT:-8080}
+PUBLIC_API_PATH=${PUBLIC_API_PATH:-/api/v1}
+DUCKDNS_DOMAIN=${DUCKDNS_DOMAIN:-}
+DUCKDNS_TOKEN=${DUCKDNS_TOKEN:-}
 EOF
   chmod 600 "${REPO_DIR}/backend/.env"
   echo "    Archivo ${REPO_DIR}/backend/.env creado desde variables de entorno."

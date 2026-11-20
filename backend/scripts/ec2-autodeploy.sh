@@ -3,9 +3,10 @@
 # El Volcán — Auto-arranque y Auto-actualización Docker en AWS EC2
 # -----------------------------------------------------------------------------
 # Modos de uso:
-#   ./ec2-autodeploy.sh --boot   -> Ejecutado al iniciar la instancia EC2 (systemd)
-#   ./ec2-autodeploy.sh --cron   -> Ejecutado todos los días a las 03:00 AM Chile
-#   ./ec2-autodeploy.sh --force  -> Fuerza actualización y rebuild manual
+#   ./ec2-autodeploy.sh --boot     -> Ejecutado al iniciar la instancia EC2 (systemd)
+#   ./ec2-autodeploy.sh --cron     -> Ejecutado todos los días a las 03:00 AM Chile
+#   ./ec2-autodeploy.sh --force    -> Fuerza actualización, rebuild Docker y sync de IP
+#   ./ec2-autodeploy.sh --sync-ip  -> Solo detecta y sincroniza la IP pública con Render/DuckDNS
 # =============================================================================
 
 set -euo pipefail
@@ -38,6 +39,16 @@ fi
 
 log "==================================================================="
 log "Iniciando proceso en ${REPO_DIR} (rama: ${BRANCH})"
+
+if [[ "${MODO}" == "--sync-ip" ]]; then
+  if [[ -f "${SCRIPT_DIR}/ec2-sync-ip.sh" ]]; then
+    ELVOLCAN_REPO_DIR="${REPO_DIR}" ELVOLCAN_LOG_FILE="${LOG_FILE}" bash "${SCRIPT_DIR}/ec2-sync-ip.sh" --force
+  else
+    log "ERROR: No se encontró ${SCRIPT_DIR}/ec2-sync-ip.sh"
+    exit 1
+  fi
+  exit 0
+fi
 
 # 1. Asegurar que el demonio de Docker esté activo
 if ! systemctl is-active --quiet docker; then
@@ -119,7 +130,18 @@ else
   docker compose up -d --remove-orphans >>"${LOG_FILE}" 2>&1
 fi
 
-# 5. Verificación de estado del API Gateway
+# 5. Sincronizar IP pública dinámica de AWS EC2 con Render y/o DuckDNS (en paralelo mientras levanta Spring Boot)
+if [[ -f "${SCRIPT_DIR}/ec2-sync-ip.sh" ]]; then
+  SYNC_ARG="auto"
+  if [[ "${MODO}" == "--force" ]]; then
+    SYNC_ARG="--force"
+  fi
+  if ! ELVOLCAN_REPO_DIR="${REPO_DIR}" ELVOLCAN_LOG_FILE="${LOG_FILE}" bash "${SCRIPT_DIR}/ec2-sync-ip.sh" "${SYNC_ARG}"; then
+    log "ADVERTENCIA: La sincronización automática de IP pública reportó un problema (los contenedores Docker siguen operando normalmente)."
+  fi
+fi
+
+# 6. Verificación de estado del API Gateway
 log "Verificando salud del API Gateway en http://localhost:8080/actuator/health..."
 GATEWAY_OK=false
 for intento in $(seq 1 24); do

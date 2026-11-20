@@ -79,15 +79,17 @@ docker compose up --build -d
 
 ---
 
-## 5. Automatización en AWS EC2 (Auto-arranque + Auto-update 03:00 AM Chile)
+## 5. Automatización en AWS EC2 (Auto-arranque + Auto-update 03:00 AM Chile + IP Pública Dinámica)
 
-En `backend/scripts/` se incluyen dos scripts para operar sin intervención manual en AWS EC2 (Ubuntu 22.04/24.04):
+En `backend/scripts/` se incluyen tres scripts para operar sin intervención manual en AWS EC2 (Ubuntu 22.04/24.04):
 
 * **`backend/scripts/ec2-userdata-setup.sh`**:
   * Se puede pegar en **User Data** al crear la instancia EC2 o ejecutar una sola vez con `sudo bash backend/scripts/ec2-userdata-setup.sh`.
   * Configura `America/Santiago`, crea SWAP de 4 GB, instala Docker + Compose, habilita el servicio `systemd` (`elvolcan-docker.service`) para iniciar automáticamente los contenedores en cada arranque de EC2 y programa la actualización diaria vía Cron a las **03:00 AM hora de Santiago de Chile**.
 * **`backend/scripts/ec2-autodeploy.sh`**:
-  * Detecta automáticamente si existen nuevos commits en `origin/main` de GitHub. Si hay cambios, actualiza el clon (preservando `backend/.env`), reconstruye y levanta los contenedores con `docker compose up --build -d --remove-orphans`, limpia imágenes huérfanas y registra todo en `/var/log/elvolcan-autodeploy.log`.
+  * Detecta automáticamente si existen nuevos commits en `origin/main` de GitHub. Si hay cambios, actualiza el clon (preservando `backend/.env`), reconstruye y levanta los contenedores con `docker compose up --build -d --remove-orphans`, limpia imágenes huérfanas, dispara la sincronización de IP pública y registra todo en `/var/log/elvolcan-autodeploy.log`.
+* **`backend/scripts/ec2-sync-ip.sh`**:
+  * Al iniciar la instancia EC2 (ideal para AWS Academy donde cambia la IP pública al reiniciar el laboratorio), detecta la nueva IPv4 pública vía **EC2 IMDSv2** (`169.254.169.254`) y actualiza automáticamente `VITE_API_URL` en Render + dispara el deploy del frontend (usando `RENDER_API_KEY` y `RENDER_SERVICE_ID` en `backend/.env`, sin tocar `VITE_CARTO_API_KEY`), y/o actualiza DuckDNS (`DUCKDNS_DOMAIN` + `DUCKDNS_TOKEN`).
 
 ---
 
