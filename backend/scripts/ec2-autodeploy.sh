@@ -15,6 +15,9 @@ export TZ="America/Santiago"
 export HOME="${HOME:-/root}"
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0="safe.directory"
+export GIT_CONFIG_VALUE_0="*"
 
 MODO="${1:---cron}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -87,10 +90,21 @@ if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
 fi
 
 # Permitir operaciones git aunque el servicio corra como root (systemd/cron) sobre un repo de ubuntu
+REPO_OWNER="$(stat -c '%U:%G' "${REPO_DIR}" 2>/dev/null || echo "")"
+git config --system --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 git config --global --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 
 git_repo() {
-  git -c "safe.directory=${REPO_DIR}" -C "${REPO_DIR}" "$@"
+  git -c "safe.directory=*" -c "safe.directory=${REPO_DIR}" -C "${REPO_DIR}" "$@"
+}
+
+restaurar_dueno_repo() {
+  if [[ -n "${REPO_OWNER}" && "${REPO_OWNER}" != "root:root" ]]; then
+    chown -R "${REPO_OWNER}" "${REPO_DIR}/.git" 2>/dev/null || true
+    if [[ "${HAY_CAMBIOS:-false}" == "true" ]]; then
+      chown -R "${REPO_OWNER}" "${REPO_DIR}" 2>/dev/null || true
+    fi
+  fi
 }
 
 cd "${REPO_DIR}"
@@ -125,12 +139,14 @@ if [[ "${HAY_CAMBIOS}" == "true" || "${MODO}" == "--force" ]]; then
     chmod +x "${REPO_DIR}"/backend/scripts/*.sh 2>/dev/null || true
   fi
 
+  restaurar_dueno_repo
   log "Reconstruyendo y actualizando contenedores Docker (sigue el progreso en vivo con: tail -f ${LOG_FILE})..."
   docker compose up --build -d --remove-orphans >>"${LOG_FILE}" 2>&1
 
   log "Limpiando imágenes Docker huérfanas para preservar espacio en disco..."
   docker image prune -f >>"${LOG_FILE}" 2>&1 || true
 else
+  restaurar_dueno_repo
   # En arranque (--boot) o cron sin cambios, asegurar que todos los contenedores estén arriba
   log "Verificando y asegurando ejecución de todos los contenedores Docker..."
   docker compose up -d --remove-orphans >>"${LOG_FILE}" 2>&1

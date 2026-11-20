@@ -81,6 +81,7 @@ if [[ ! -d "${REPO_DIR}/.git" ]]; then
 fi
 
 git config --system --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
+git config --system --add safe.directory '*' >/dev/null 2>&1 || true
 git config --global --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 chmod +x "${REPO_DIR}/backend/scripts/ec2-autodeploy.sh"
 chmod +x "${REPO_DIR}/backend/scripts/ec2-sync-ip.sh"
@@ -122,6 +123,9 @@ Type=oneshot
 RemainAfterExit=yes
 Environment=HOME=/root
 Environment=TZ=America/Santiago
+Environment=GIT_CONFIG_COUNT=1
+Environment=GIT_CONFIG_KEY_0=safe.directory
+Environment=GIT_CONFIG_VALUE_0=*
 Environment=ELVOLCAN_REPO_DIR=${REPO_DIR}
 Environment=ELVOLCAN_BRANCH=${BRANCH}
 Environment=ELVOLCAN_LOG_FILE=${LOG_FILE}
