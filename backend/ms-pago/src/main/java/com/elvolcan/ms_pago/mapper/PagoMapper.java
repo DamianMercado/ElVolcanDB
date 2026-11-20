@@ -16,6 +16,8 @@ public interface PagoMapper {
     @Mapping(target = "codigoTransaccion", ignore = true)
     @Mapping(target = "codigoAutorizacion", ignore = true)
     @Mapping(target = "fechaPago", ignore = true)
+    @Mapping(target = "fechaPagoChile", ignore = true)
+    @Mapping(target = "zonaHoraria", ignore = true)
     Pago toEntity(PagoRequest request);
 
     PagoResponse toResponse(Pago pago);

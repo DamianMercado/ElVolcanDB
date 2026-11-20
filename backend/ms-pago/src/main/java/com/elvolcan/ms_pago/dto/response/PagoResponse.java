@@ -25,4 +25,6 @@ public class PagoResponse {
     private String emailComprobante;
     private String nombreTitular;
     private LocalDateTime fechaPago;
+    private String fechaPagoChile;
+    private String zonaHoraria;
 }

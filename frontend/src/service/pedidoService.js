@@ -4,7 +4,11 @@ import {
   realizarPeticion,
   obtenerMensaje,
 } from './endpoints'
-import { fechaDeHoy } from '../utils/formato'
+import {
+  fechaDeHoy,
+  formatearFechaChile,
+  formatearHoraChile,
+} from '../utils/formato'
 
 const CLAVE_ULTIMO_PEDIDO = 'ultimo_pedido_creado'
 
@@ -12,7 +16,9 @@ const obtenerHeadersAuth = (conJson = false) => {
   const token = localStorage.getItem(Variables.tokenKey)
   const headers = { Accept: 'application/json' }
   if (conJson) headers['Content-Type'] = 'application/json'
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers.Authorization = `Bearer ${token}`
+  }
   return headers
 }
 
@@ -20,16 +26,17 @@ const formatearEstadoVenta = (estadoVenta) => {
   const norm = String(estadoVenta || '').toUpperCase()
   if (norm === 'ENTREGADO') return 'Entregado'
   if (norm === 'EN_RUTA') return 'En ruta'
+  if (norm === 'CANCELADA') return 'Cancelada'
   return 'Pendiente'
 }
 
-const normalizarVenta = (v) => {
-  const fechaObj = v.fechaVenta ? new Date(v.fechaVenta) : new Date()
-  const fechaValida = !Number.isNaN(fechaObj.getTime())
+export const normalizarVenta = (v) => {
+  const fechaFuente = v.fechaVentaChile || v.fechaVenta || null
 
   return {
     id: String(v.id ?? ''),
     codigo: v.codigoVenta || `EV-${v.id}`,
+    codigoVenta: v.codigoVenta || `EV-${v.id}`,
     idUsuario: v.idUsuario ?? null,
     cliente: v.cliente || 'Cliente Particular',
     rut: v.rut || '',
@@ -60,24 +67,17 @@ const normalizarVenta = (v) => {
     metodoPago: v.metodoPago || 'efectivo',
     subMetodoPago:
       v.subMetodoPago || (v.metodoPago === 'pagar_ahora' ? 'webpay' : 'efectivo'),
+    estadoVenta: v.estadoVenta || null,
     estado: v.estado && !v.estadoVenta ? v.estado : formatearEstadoVenta(v.estadoVenta),
     estadoPago: String(v.estadoPago || 'pendiente').toLowerCase(),
     repartidor: v.repartidor || null,
-    fecha: fechaValida
-      ? fechaObj
-          .toLocaleDateString('es-CL', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })
-          .replaceAll('-', '/')
-      : fechaDeHoy(),
-    hora: fechaValida
-      ? fechaObj.toLocaleTimeString('es-CL', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : '',
+    entrega: v.entrega || null,
+    auditoria: Array.isArray(v.auditoria) ? v.auditoria : [],
+    fechaVenta: v.fechaVenta || null,
+    fechaVentaChile: v.fechaVentaChile || null,
+    zonaHoraria: v.zonaHoraria || 'America/Santiago',
+    fecha: fechaFuente ? formatearFechaChile(fechaFuente, fechaDeHoy()) : fechaDeHoy(),
+    hora: fechaFuente ? formatearHoraChile(fechaFuente) : '',
     codigoTransaccion: v.codigoTransaccion || null,
     codigoAutorizacion: v.codigoAutorizacion || null,
   }
@@ -104,9 +104,90 @@ export async function ListarPedidosServicio() {
 
 export const obtenerPedidos = ListarPedidosServicio
 
+export async function obtenerPedidoPorId(id) {
+  const respuesta = await realizarPeticion(Rutas.venta(id), {
+    method: 'GET',
+    headers: obtenerHeadersAuth(false),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+  if (!respuesta.ok) {
+    throw new Error(
+      obtenerMensaje(
+        datos.mensaje || datos.message,
+        'No encontramos el pedido solicitado.',
+      ),
+    )
+  }
+
+  return normalizarVenta(datos)
+}
+
+export async function obtenerPedidoPorCodigo(codigo) {
+  const limpio = String(codigo || '').replace('#', '').trim()
+  const respuesta = await realizarPeticion(Rutas.ventaPorCodigo(limpio), {
+    method: 'GET',
+    headers: obtenerHeadersAuth(false),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+  if (!respuesta.ok) {
+    throw new Error(
+      obtenerMensaje(
+        datos.mensaje || datos.message,
+        `No encontramos el pedido ${limpio}.`,
+      ),
+    )
+  }
+
+  return normalizarVenta(datos)
+}
+
+export async function obtenerPedidosPorUsuario(idUsuario) {
+  const respuesta = await realizarPeticion(Rutas.ventasPorUsuario(idUsuario), {
+    method: 'GET',
+    headers: obtenerHeadersAuth(false),
+  })
+
+  const datos = await respuesta.json().catch(() => null)
+  if (!respuesta.ok || !Array.isArray(datos)) {
+    throw new Error(
+      obtenerMensaje(
+        datos?.mensaje || datos?.message,
+        'No pudimos cargar tus pedidos en este momento.',
+      ),
+    )
+  }
+
+  return datos.map(normalizarVenta)
+}
+
+export async function obtenerPedidosPorRepartidor(nombreRepartidor) {
+  const respuesta = await realizarPeticion(
+    Rutas.ventasPorRepartidor(nombreRepartidor),
+    {
+      method: 'GET',
+      headers: obtenerHeadersAuth(false),
+    },
+  )
+
+  const datos = await respuesta.json().catch(() => null)
+  if (!respuesta.ok || !Array.isArray(datos)) {
+    throw new Error(
+      obtenerMensaje(
+        datos?.mensaje || datos?.message,
+        'No pudimos cargar los pedidos asignados al repartidor.',
+      ),
+    )
+  }
+
+  return datos.map(normalizarVenta)
+}
+
 export async function crearNuevoPedido(datos) {
+  const idUsuarioFinal = Number(datos.idUsuario) > 0 ? Number(datos.idUsuario) : 4
   const payload = {
-    idUsuario: datos.idUsuario || 4,
+    idUsuario: idUsuarioFinal,
     cliente: datos.cliente || 'Cliente Particular',
     rut: datos.rut || '',
     email: datos.email || '',
@@ -199,7 +280,7 @@ export async function actualizarEstadoPago(id, datosPago = {}) {
     codigoAutorizacion: pago.codigoAutorizacion || datosPago.codigoAutorizacion,
     tarjetaTerminacion:
       pago.tarjetaTerminacion || datosPago.tarjetaTerminacion || '0001',
-    fechaPago: pago.fechaPago || new Date().toISOString(),
+    fechaPago: pago.fechaPagoChile || pago.fechaPago || new Date().toISOString(),
   }
 
   try {
@@ -235,6 +316,64 @@ export async function asignarRepartidorPedido(idPedido, nombreRepartidor) {
       obtenerMensaje(
         datos.mensaje || datos.message,
         'No pudimos asignar el repartidor en este momento. Inténtalo nuevamente.',
+      ),
+    )
+  }
+
+  return normalizarVenta(datos)
+}
+
+export async function actualizarSeguimientoPedido(idPedido, seguimiento) {
+  const respuesta = await realizarPeticion(Rutas.ventaSeguimiento(idPedido), {
+    method: 'PUT',
+    headers: obtenerHeadersAuth(true),
+    body: JSON.stringify(seguimiento),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+  if (!respuesta.ok) {
+    throw new Error(
+      obtenerMensaje(
+        datos.mensaje || datos.message,
+        'No pudimos actualizar el seguimiento del pedido.',
+      ),
+    )
+  }
+
+  return normalizarVenta(datos)
+}
+
+export async function marcarPedidoEntregado(idPedido) {
+  const respuesta = await realizarPeticion(Rutas.ventaEntregar(idPedido), {
+    method: 'PUT',
+    headers: obtenerHeadersAuth(false),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+  if (!respuesta.ok) {
+    throw new Error(
+      obtenerMensaje(
+        datos.mensaje || datos.message,
+        'No pudimos marcar el pedido como entregado.',
+      ),
+    )
+  }
+
+  return normalizarVenta(datos)
+}
+
+export async function cancelarPedido(idPedido) {
+  const respuesta = await realizarPeticion(Rutas.ventaCancelar(idPedido), {
+    method: 'PUT',
+    headers: obtenerHeadersAuth(false),
+  })
+
+  const datos = await respuesta.json().catch(() => ({}))
+  if (!respuesta.ok) {
+    throw new Error(
+      obtenerMensaje(
+        datos.mensaje || datos.message,
+        'No pudimos cancelar el pedido en este momento.',
       ),
     )
   }

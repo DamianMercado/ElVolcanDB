@@ -6,15 +6,12 @@ import {
   obtenerRutaOSRM,
   calcularRumbo,
   actualizarPosicionRepartidor,
-  cambiarEstadoEntrega,
 } from '../../service/repartoService'
 import { Variables } from '../../config/variables'
 
-// Generador de iconos HTML personalizados para Leaflet
 const CARTO_API_KEY = Variables.cartoApiKey
 
 const obtenerUrlTiles = (modoOscuro = false) => {
-  // Paleta Uber CartoDB: Positron día (#ffffff / #e7e8ec / #adadad) y Dark Matter noche (#121212)
   const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
   return modoOscuro
     ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png${queryParam}`
@@ -58,7 +55,7 @@ const crearIconoOrigen = () => {
     className: 'custom-div-icon',
     html: `
       <div class="pin-contenedor-origen">
-        <svg class="w-4 h-4 text-[#00A8E8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-5 h-5 text-[#2171ec]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       </div>
@@ -81,27 +78,34 @@ export function MapaRepartidor({
   const contenedorRef = useRef(null)
   const mapaRef = useRef(null)
   const marcadorCamionRef = useRef(null)
+  const marcadorDestinoRef = useRef(null)
   const lineaRecorridaRef = useRef(null)
   const lineaRestanteRef = useRef(null)
   const seguirCamionRef = useRef(true)
+  const capaTilesRef = useRef(null)
 
   const [rutaPuntos, setRutaPuntos] = useState([])
   const [pasos, setPasos] = useState([])
-  const [pasoActual, setPasoActual] = useState(null)
   const [indiceActual, setIndiceActual] = useState(
     entrega?.posicionActual?.indicePunto || 0
   )
+  const [pasoActual, setPasoActual] = useState(null)
+  const [distanciaTotalKm, setDistanciaTotalKm] = useState(2.4)
+  const [duracionTotalMin, setDuracionTotalMin] = useState(9)
   const [modoOscuro, setModoOscuro] = useState(false)
-  const capaTilesRef = useRef(null)
 
-  // 1. Inicializar Mapa Leaflet
+  const origenLat = entrega?.origen?.lat ?? COORDENADAS_PLANTA_ORIGEN.lat
+  const origenLng = entrega?.origen?.lng ?? COORDENADAS_PLANTA_ORIGEN.lng
+  const destinoLat =
+    entrega?.cliente?.coordenadas?.lat ?? COORDENADAS_CLIENTE_DESTINO.lat
+  const destinoLng =
+    entrega?.cliente?.coordenadas?.lng ?? COORDENADAS_CLIENTE_DESTINO.lng
+
+  // 1. Inicializar Mapa Leaflet una sola vez
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return
 
-    const centroInicial = [
-      entrega?.posicionActual?.lat || COORDENADAS_PLANTA_ORIGEN.lat,
-      entrega?.posicionActual?.lng || COORDENADAS_PLANTA_ORIGEN.lng,
-    ]
+    const centroInicial = [COORDENADAS_PLANTA_ORIGEN.lat, COORDENADAS_PLANTA_ORIGEN.lng]
 
     const mapa = L.map(contenedorRef.current, {
       center: centroInicial,
@@ -109,10 +113,7 @@ export function MapaRepartidor({
       zoomControl: false,
     })
 
-    // Tile Layer: OpenStreetMap / CartoDB si hay API Key
-    const urlTiles = obtenerUrlTiles(modoOscuro)
-
-    const capaTiles = L.tileLayer(urlTiles, {
+    const capaTiles = L.tileLayer(obtenerUrlTiles(false), {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
@@ -120,10 +121,9 @@ export function MapaRepartidor({
     }).addTo(mapa)
     capaTilesRef.current = capaTiles
 
-    // Control de zoom en esquina inferior derecha
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
 
-    // Marcador Origen (Planta de Gas El Volcán)
+    // Marcador Origen (Planta El Volcán)
     L.marker([COORDENADAS_PLANTA_ORIGEN.lat, COORDENADAS_PLANTA_ORIGEN.lng], {
       icon: crearIconoOrigen(),
     })
@@ -136,35 +136,20 @@ export function MapaRepartidor({
       .addTo(mapa)
 
     // Marcador Destino (Cliente)
-    L.marker([COORDENADAS_CLIENTE_DESTINO.lat, COORDENADAS_CLIENTE_DESTINO.lng], {
-      icon: crearIconoDestino(),
-    })
-      .bindPopup(
-        `<div class="p-1 text-xs">
-          <strong class="text-[#FF4500] font-bold text-sm">Destino de Entrega</strong>
-          <p class="font-semibold text-slate-800">${entrega?.cliente?.nombre || 'Cliente'}</p>
-          <p class="text-slate-600">${entrega?.cliente?.direccion || 'Puente Alto'}</p>
-        </div>`
-      )
-      .addTo(mapa)
+    const marcadorDestino = L.marker(
+      [COORDENADAS_CLIENTE_DESTINO.lat, COORDENADAS_CLIENTE_DESTINO.lng],
+      { icon: crearIconoDestino() }
+    ).addTo(mapa)
+    marcadorDestinoRef.current = marcadorDestino
 
     // Marcador Repartidor (Camión móvil)
-    const rumboInicial = entrega?.posicionActual?.rumbo || 180
     const marcadorCamion = L.marker(centroInicial, {
-      icon: crearIconoCamion(rumboInicial),
+      icon: crearIconoCamion(180),
       zIndexOffset: 1000,
-    })
-      .bindPopup(
-        `<div class="p-1 text-xs">
-          <strong class="text-blue-700 font-bold text-sm">Tú (Repartidor)</strong>
-          <p class="text-slate-700 font-medium">${entrega?.repartidor?.nombre || 'Carlos Silva'}</p>
-          <p class="text-slate-500">${entrega?.repartidor?.vehiculo || 'Furgón de Gas'}</p>
-        </div>`
-      )
-      .addTo(mapa)
+    }).addTo(mapa)
     marcadorCamionRef.current = marcadorCamion
 
-    // Polilíneas de ruta: recorrido (gris #adadad) y restante (azul Uber #2171ec)
+    // Polilíneas de ruta
     const lineaRecorrida = L.polyline([], {
       color: '#adadad',
       weight: 5,
@@ -182,54 +167,84 @@ export function MapaRepartidor({
     }).addTo(mapa)
     lineaRestanteRef.current = lineaRestante
 
-    mapaRef.current = mapa
-
-    // Si el usuario arrastra manualmente el mapa, desactiva temporalmente el seguimiento automático
     mapa.on('dragstart', () => {
       seguirCamionRef.current = false
     })
 
-    // Asegurar que el mapa ocupe el 100% exacto de la pantalla sin espacios vacíos
-    const manejarRedimension = () => {
-      mapa.invalidateSize()
-    }
-    window.addEventListener('resize', manejarRedimension)
-    const timerInvalidate = setTimeout(() => {
-      mapa.invalidateSize()
-    }, 200)
+    mapaRef.current = mapa
 
     return () => {
-      window.removeEventListener('resize', manejarRedimension)
-      clearTimeout(timerInvalidate)
       mapa.remove()
       mapaRef.current = null
     }
   }, [])
 
+  // Actualizar marcadores y popups cuando cambia la entrega activa
+  useEffect(() => {
+    if (marcadorDestinoRef.current) {
+      marcadorDestinoRef.current.setLatLng([destinoLat, destinoLng])
+      marcadorDestinoRef.current.bindPopup(
+        `<div class="p-1 text-xs">
+          <strong class="text-[#FF4500] font-bold text-sm">Destino de Entrega</strong>
+          <p class="font-semibold text-slate-800">${entrega?.cliente?.nombre || 'Cliente'}</p>
+          <p class="text-slate-600">${entrega?.cliente?.direccion || 'Puente Alto'}</p>
+        </div>`
+      )
+    }
+
+    if (marcadorCamionRef.current) {
+      const lat = entrega?.posicionActual?.lat ?? origenLat
+      const lng = entrega?.posicionActual?.lng ?? origenLng
+      const rumbo = entrega?.posicionActual?.rumbo ?? 180
+      marcadorCamionRef.current.setLatLng([lat, lng])
+      marcadorCamionRef.current.setIcon(crearIconoCamion(rumbo))
+      marcadorCamionRef.current.bindPopup(
+        `<div class="p-1 text-xs">
+          <strong class="text-blue-700 font-bold text-sm">Repartidor</strong>
+          <p class="text-slate-700 font-medium">${entrega?.repartidor?.nombre || 'Carlos Ruiz'}</p>
+          <p class="text-slate-500">${entrega?.repartidor?.vehiculo || 'Furgón de Gas'}</p>
+        </div>`
+      )
+    }
+  }, [
+    destinoLat,
+    destinoLng,
+    origenLat,
+    origenLng,
+    entrega?.cliente?.nombre,
+    entrega?.cliente?.direccion,
+    entrega?.repartidor?.nombre,
+    entrega?.repartidor?.vehiculo,
+    entrega?.posicionActual?.lat,
+    entrega?.posicionActual?.lng,
+    entrega?.posicionActual?.rumbo,
+  ])
+
   // Cambiar tema de mapa (Día/Noche)
   useEffect(() => {
     if (!capaTilesRef.current) return
-    const urlTiles = obtenerUrlTiles(modoOscuro)
-    capaTilesRef.current.setUrl(urlTiles)
+    capaTilesRef.current.setUrl(obtenerUrlTiles(modoOscuro))
   }, [modoOscuro])
 
-  // 2. Cargar Ruta Real de Conducción con OSRM
+  // 2. Cargar Ruta Real de Conducción con OSRM según el destino del pedido actual
   useEffect(() => {
     let cancelado = false
     const cargarRuta = async () => {
       const res = await obtenerRutaOSRM(
-        COORDENADAS_PLANTA_ORIGEN,
-        COORDENADAS_CLIENTE_DESTINO
+        { lat: origenLat, lng: origenLng },
+        { lat: destinoLat, lng: destinoLng }
       )
       if (cancelado) return
 
       setRutaPuntos(res.puntos)
       setPasos(res.pasos)
+      setDistanciaTotalKm(res.distanciaKm || 2.4)
+      setDuracionTotalMin(res.duracionMinutos || 9)
       if (res.pasos.length > 0) {
         setPasoActual(res.pasos[0])
       }
+      setIndiceActual(0)
 
-      // Ajustar vista inicial
       if (mapaRef.current && res.puntos.length > 0) {
         mapaRef.current.fitBounds(res.puntos, {
           padding: [60, 60],
@@ -242,7 +257,7 @@ export function MapaRepartidor({
     return () => {
       cancelado = true
     }
-  }, [])
+  }, [origenLat, origenLng, destinoLat, destinoLng, entrega?.codigoVenta])
 
   // 3. Actualizar Polilíneas según el índice actual
   useEffect(() => {
@@ -279,18 +294,15 @@ export function MapaRepartidor({
         marcadorCamionRef.current.setIcon(crearIconoCamion(rumbo))
       }
 
-      // Centrar mapa suavemente si el modo de seguimiento está activo
       if (seguirCamionRef.current && mapaRef.current) {
         mapaRef.current.panTo(punto, { animate: true, duration: 0.5 })
       }
 
-      // Calcular telemetría restante
       const totalPuntos = rutaPuntos.length
       const avanceRatio = (totalPuntos - nuevoIndice) / totalPuntos
-      const distanciaRestanteKm = Number((2.4 * avanceRatio).toFixed(1))
-      const etaMinutos = Math.max(1, Math.round(9 * avanceRatio))
+      const distanciaRestanteKm = Number((distanciaTotalKm * avanceRatio).toFixed(1))
+      const etaMinutos = Math.max(1, Math.round(duracionTotalMin * avanceRatio))
 
-      // Identificar paso de navegación correspondiente
       if (pasos.length > 0) {
         const indicePaso = Math.min(
           Math.floor((nuevoIndice / totalPuntos) * pasos.length),
@@ -299,11 +311,14 @@ export function MapaRepartidor({
         setPasoActual(pasos[indicePaso])
       }
 
-      setIndiceActual(nuevoIndice)
-      alCambiarPunto?.(nuevoIndice, punto)
+      const nuevoEstado =
+        nuevoIndice >= totalPuntos - 1
+          ? 'llegando'
+          : nuevoIndice > 0
+          ? 'en_camino'
+          : 'asignado'
 
-      // Guardar en el servicio global sincronizado
-      actualizarPosicionRepartidor({
+      const telemetria = {
         lat: punto[0],
         lng: punto[1],
         indicePunto: nuevoIndice,
@@ -311,27 +326,31 @@ export function MapaRepartidor({
         distanciaRestanteKm,
         etaMinutos,
         velocidadKmH: nuevoIndice >= totalPuntos - 1 ? 0 : 42,
-        nuevoEstado:
-          nuevoIndice >= totalPuntos - 1
-            ? 'llegando'
-            : nuevoIndice > 0
-            ? 'en_camino'
-            : 'asignado',
-      })
+        nuevoEstado,
+      }
 
-      // ¿Llegó al destino?
+      setIndiceActual(nuevoIndice)
+      actualizarPosicionRepartidor(telemetria)
+      alCambiarPunto?.(nuevoIndice, punto, telemetria)
+
       if (nuevoIndice >= totalPuntos - 1) {
         alLlegarDestino?.()
       }
     },
-    [rutaPuntos, pasos, alCambiarPunto, alLlegarDestino]
+    [
+      rutaPuntos,
+      pasos,
+      distanciaTotalKm,
+      duracionTotalMin,
+      alCambiarPunto,
+      alLlegarDestino,
+    ]
   )
 
   // 5. Simulación de movimiento automático paso a paso
   useEffect(() => {
     if (!simulando || !rutaPuntos.length) return
 
-    // Intervalo de avance según velocidad (1x = 1200ms, 2x = 600ms, 5x = 250ms)
     const delay = Math.max(200, Math.round(1200 / velocidadSimulacion))
 
     const intervalo = setInterval(() => {
@@ -349,7 +368,6 @@ export function MapaRepartidor({
     return () => clearInterval(intervalo)
   }, [simulando, rutaPuntos, velocidadSimulacion, moverCamion])
 
-  // Botón para centrar en el repartidor y reactivar seguimiento
   const reenfocarRepartidor = () => {
     seguirCamionRef.current = true
     if (mapaRef.current && rutaPuntos[indiceActual]) {
@@ -357,7 +375,6 @@ export function MapaRepartidor({
     }
   }
 
-  // Botón para ver toda la ruta
   const verRutaCompleta = () => {
     seguirCamionRef.current = false
     if (mapaRef.current && rutaPuntos.length > 0) {
@@ -366,13 +383,15 @@ export function MapaRepartidor({
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#e7e8ec] mapa-estilo-uber">
-      {/* Contenedor del Mapa Leaflet a pantalla completa */}
+    <div
+      className={`relative h-full w-full overflow-hidden mapa-estilo-uber ${
+        modoOscuro ? 'bg-[#121212]' : 'bg-[#e7e8ec]'
+      }`}
+    >
       <div ref={contenedorRef} className="h-full w-full" />
 
-      {/* BARRA SUPERIOR FLOTANTE DENTRO DEL MAPA: Menú Hamburguesa + HUD Turn-by-Turn Estilo Uber */}
+      {/* BARRA SUPERIOR FLOTANTE DENTRO DEL MAPA */}
       <div className="pointer-events-none absolute top-3 right-3 left-3 z-30 flex items-start gap-2.5">
-        {/* Botón Menú Hamburguesa dentro del Mapa */}
         {alAbrirMenu && (
           <button
             type="button"
@@ -387,9 +406,8 @@ export function MapaRepartidor({
           </button>
         )}
 
-        {/* HUD Turn-by-Turn Adaptativo Estilo Uber */}
+        {/* HUD Turn-by-Turn */}
         <div className="pointer-events-auto flex flex-1 items-center gap-2.5 rounded-2xl border border-[#e7e8ec]/20 bg-[#121212]/95 px-3 py-2 text-white shadow-2xl backdrop-blur-md min-w-0 md:px-4 md:py-2.5">
-          {/* Icono de Maniobra con acento azul Uber #2171ec */}
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#2171ec]/20 text-[#2171ec] md:h-11 md:w-11">
             {pasoActual?.tipo === 'arrive' ? (
               <svg className="h-6 w-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -410,7 +428,6 @@ export function MapaRepartidor({
             )}
           </div>
 
-          {/* Texto de la Maniobra */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-bold tracking-wider text-[#2171ec] uppercase md:text-xs">
@@ -421,27 +438,26 @@ export function MapaRepartidor({
               </span>
             </div>
             <p className="truncate text-xs font-semibold text-white md:text-sm">
-              {pasoActual?.instruccion || 'Diríjase al sur por Av. Concha y Toro'}
+              {pasoActual?.instruccion || 'Diríjase hacia el domicilio del cliente'}
             </p>
           </div>
 
-          {/* Métricas en Vivo (ETA y Distancia) */}
           <div className="shrink-0 border-l border-white/15 pl-2.5 text-right md:pl-3">
             <div className="text-base font-black tracking-tight text-[#2171ec] md:text-lg">
               {indiceActual >= rutaPuntos.length - 1
                 ? '0 min'
-                : `${Math.max(1, Math.round(9 * ((rutaPuntos.length - indiceActual) / (rutaPuntos.length || 1))))} min`}
+                : `${Math.max(1, Math.round(duracionTotalMin * ((rutaPuntos.length - indiceActual) / (rutaPuntos.length || 1))))} min`}
             </div>
             <div className="text-[10px] font-medium text-[#adadad] md:text-xs">
               {indiceActual >= rutaPuntos.length - 1
                 ? '0.0 km'
-                : `${(2.4 * ((rutaPuntos.length - indiceActual) / (rutaPuntos.length || 1))).toFixed(1)} km`}
+                : `${(distanciaTotalKm * ((rutaPuntos.length - indiceActual) / (rutaPuntos.length || 1))).toFixed(1)} km`}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Controles Flotantes de Navegación Lateral (Centrar, Mapa Completo, Noche/Día) */}
+      {/* Controles Flotantes Laterales */}
       <div className="absolute top-20 right-3 z-20 flex flex-col gap-2">
         <button
           type="button"
@@ -483,7 +499,6 @@ export function MapaRepartidor({
         </button>
       </div>
 
-      {/* SECCIÓN DEL PEDIDO EN CURSO (DENTRO DEL MAPA) */}
       {seccionPedido}
     </div>
   )

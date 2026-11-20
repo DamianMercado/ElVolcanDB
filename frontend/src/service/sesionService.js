@@ -3,9 +3,10 @@ import {
   realizarPeticion,
   obtenerMensaje,
 } from './endpoints'
+import { normalizarUsuarioSesion } from '../utils/token'
 
 export const IniciarSesion = async ({ correo, email, clave, password }) => {
-  const emailFinal = (correo || email || '').trim()
+  const emailFinal = (correo || email || '').trim().toLowerCase()
   const passwordFinal = clave || password || ''
 
   const respuesta = await realizarPeticion(Rutas.login, {
@@ -34,12 +35,13 @@ export const IniciarSesion = async ({ correo, email, clave, password }) => {
 
   return {
     token: datos.token,
-    usuario: datos,
+    usuario: normalizarUsuarioSesion(datos),
   }
 }
 
 export const RegistrarCuenta = async (datosRegistro) => {
   try {
+    const emailNormalizado = (datosRegistro.email || '').trim().toLowerCase()
     const respuesta = await realizarPeticion(Rutas.registro, {
       method: 'POST',
       headers: {
@@ -53,7 +55,7 @@ export const RegistrarCuenta = async (datosRegistro) => {
         telefono: datosRegistro.telefono,
         direccion: datosRegistro.direccion,
         comuna: datosRegistro.comuna,
-        email: datosRegistro.email,
+        email: emailNormalizado,
         password: datosRegistro.contraseña || datosRegistro.password,
         rol: (datosRegistro.rol || 'CLIENTE').toUpperCase(),
       }),
@@ -72,7 +74,10 @@ export const RegistrarCuenta = async (datosRegistro) => {
 
     return {
       exito: true,
-      usuario: datos,
+      usuario: normalizarUsuarioSesion({
+        ...datos,
+        depto: datosRegistro.depto || '',
+      }),
       token: datos.token,
     }
   } catch (err) {
@@ -114,5 +119,44 @@ export const RecuperarClaveServicio = async ({ email, nuevaPassword }) => {
   return {
     exito: true,
     mensaje: 'Contraseña restablecida exitosamente.',
+  }
+}
+
+export const ValidarSesionServicio = async (token) => {
+  if (!token) return { valido: false }
+  try {
+    const respuesta = await fetch(
+      `${Rutas.validarToken}?token=${encodeURIComponent(token)}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    )
+    if (!respuesta.ok) {
+      return { valido: false }
+    }
+    const datos = await respuesta.json().catch(() => ({ valido: false }))
+    return datos
+  } catch {
+    // Error de red: no forzar cierre para permitir tolerancia temporal
+    return { valido: true, sinConexion: true }
+  }
+}
+
+export const CerrarSesionServicio = async (token) => {
+  if (!token) return
+  try {
+    await fetch(Rutas.logout, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    })
+  } catch {
+    // Si el backend no responde, la sesión local igual se limpia
   }
 }

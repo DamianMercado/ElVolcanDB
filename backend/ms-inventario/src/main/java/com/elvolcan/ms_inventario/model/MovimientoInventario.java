@@ -50,4 +50,11 @@ public class MovimientoInventario {
 
     @Field("fecha_movimiento")
     private LocalDateTime fechaMovimiento;
+
+    @Field("fecha_movimiento_chile")
+    private String fechaMovimientoChile;
+
+    @Field("zona_horaria")
+    @Builder.Default
+    private String zonaHoraria = "America/Santiago";
 }

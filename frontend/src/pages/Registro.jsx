@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useFormulario } from '../hooks/useFormulario.js'
 import { RegistrarCuenta } from '../service/sesionService.js'
+import { useSesion } from '../context/Sesion.jsx'
+import { rutaSegunRol } from '../utils/token.js'
 import { Campo } from '../components/ui/Campo.jsx'
 import { BannerAlerta } from '../components/ui/BannerAlerta.jsx'
 import {
@@ -28,6 +30,7 @@ const VALORES_INICIALES = {
 
 export function Registro() {
   const navigate = useNavigate()
+  const { iniciar } = useSesion()
   const { valores, cambiar, reiniciar } = useFormulario(VALORES_INICIALES)
   const [alerta, setAlerta] = useState({ mensaje: '', tipo: '' })
   const [cargando, setCargando] = useState(false)
@@ -107,14 +110,15 @@ export function Registro() {
         return
       }
 
-      setTimeout(() => {
-        mostrarAlerta('¡Cuenta creada con éxito! Redirigiendo...', 'exito')
-        reiniciar(VALORES_INICIALES)
+      mostrarAlerta('¡Cuenta creada con éxito! Iniciando tu sesión...', 'exito')
+      reiniciar(VALORES_INICIALES)
 
-        setTimeout(() => {
-          navigate('/login')
-        }, 1400)
-      }, 600)
+      if (resultado.token && resultado.usuario) {
+        iniciar(resultado.token, resultado.usuario)
+        navigate(rutaSegunRol(resultado.usuario.rol), { replace: true })
+      } else {
+        navigate('/login', { replace: true })
+      }
     } catch (err) {
       setCargando(false)
       mostrarAlerta(

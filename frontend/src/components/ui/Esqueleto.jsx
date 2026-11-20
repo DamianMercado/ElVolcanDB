@@ -18,18 +18,14 @@ export function useEsperaEsqueleto(
   const [mostrandoEsqueleto, setMostrandoEsqueleto] = useState(() => ms > 0)
 
   useEffect(() => {
-    if (ms <= 0) {
-      setMostrandoEsqueleto(false)
-      return
-    }
-    setMostrandoEsqueleto(true)
+    if (ms <= 0) return undefined
     const temporizador = setTimeout(() => {
       setMostrandoEsqueleto(false)
     }, ms)
     return () => clearTimeout(temporizador)
   }, [dependencia, ms])
 
-  return mostrandoEsqueleto
+  return ms <= 0 ? false : mostrandoEsqueleto
 }
 
 export function BloqueEsqueleto({ className = '', variante = 'claro' }) {

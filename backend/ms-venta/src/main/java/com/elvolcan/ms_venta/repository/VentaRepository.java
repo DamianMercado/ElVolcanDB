@@ -13,7 +13,13 @@ public interface VentaRepository extends MongoRepository<Venta, Long> {
 
     Optional<Venta> findByCodigoVenta(String codigoVenta);
 
+    Optional<Venta> findByCodigoVentaIgnoreCase(String codigoVenta);
+
     List<Venta> findByIdUsuario(Long idUsuario);
 
     List<Venta> findByEstadoVenta(EstadoVenta estadoVenta);
+
+    List<Venta> findByRepartidorIgnoreCase(String repartidor);
+
+    Optional<Venta> findTopByOrderByIdDesc();
 }

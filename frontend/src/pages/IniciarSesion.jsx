@@ -40,34 +40,33 @@ export function IniciarSesion() {
     setCargando(true)
 
     try {
+      const emailLimpio = email.trim()
       const respuesta = await IniciarSesionServicio({
-        correo: email,
+        correo: emailLimpio,
         clave: password,
       })
 
       if (recordar) {
-        localStorage.setItem('recordar_email', email)
+        localStorage.setItem('recordar_email', emailLimpio)
       } else {
         localStorage.removeItem('recordar_email')
       }
 
       const usrFinal = respuesta.usuario
+      const nombreBienvenida =
+        usrFinal?.nombre ||
+        usrFinal?.nombreUsuario ||
+        usrFinal?.nombres ||
+        'Cliente'
+      mostrarAlerta(`¡Bienvenido, ${nombreBienvenida}!`, 'exito')
+
       if (respuesta.token) {
         iniciar(respuesta.token, usrFinal)
       } else if (usrFinal) {
         guardarSesion(usrFinal)
       }
 
-      const nombreBienvenida =
-        usrFinal?.nombreUsuario ||
-        usrFinal?.nombres ||
-        usrFinal?.nombre ||
-        'Cliente'
-      mostrarAlerta(`¡Bienvenido, ${nombreBienvenida}!`, 'exito')
-
-      setTimeout(() => {
-        navigate(rutaSegunRol(usrFinal?.rol || usrFinal?.perfil))
-      }, 900)
+      navigate(rutaSegunRol(usrFinal?.rol || usrFinal?.perfil), { replace: true })
     } catch (err) {
       mostrarAlerta(
         err?.message || 'Correo o contraseña incorrectos',

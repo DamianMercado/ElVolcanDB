@@ -52,4 +52,11 @@ public class Pago {
 
     @Field("fecha_pago")
     private LocalDateTime fechaPago;
+
+    @Field("fecha_pago_chile")
+    private String fechaPagoChile;
+
+    @Field("zona_horaria")
+    @Builder.Default
+    private String zonaHoraria = "America/Santiago";
 }

@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   obtenerEntregaActiva,
-  guardarEntregaActiva,
   reiniciarEntregaDemo,
   actualizarPosicionRepartidor,
   cambiarEstadoEntrega,
   calcularRumbo,
   obtenerRutaOSRM,
-  ENTREGA_EJEMPLO,
+  ventaAEntrega,
 } from '../service/repartoService.js'
 
 describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
@@ -24,6 +23,50 @@ describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
     expect(entrega.repartidor.nombre).toBe('Carlos Silva Morales')
     expect(entrega.total).toBe(36490)
     expect(entrega.items.length).toBeGreaterThan(0)
+  })
+
+  it('debe convertir una venta real del backend (ms-venta) en entrega sincronizable', () => {
+    const ventaBackend = {
+      id: '10',
+      codigo: 'EV-110',
+      codigoVenta: 'EV-110',
+      cliente: 'Camila Rojas',
+      telefono: '+56 9 7777 8888',
+      direccion: 'Av. Concha y Toro 2100',
+      comuna: 'Puente Alto',
+      total: 31990,
+      metodoPago: 'pagar_ahora',
+      estadoVenta: 'EN_RUTA',
+      estadoPago: 'pagado',
+      repartidor: 'Carlos Ruiz',
+      fechaVentaChile: '2026-11-20T00:15:00-03:00',
+      entrega: {
+        estado_despacho: 'en_camino',
+        eta_minutos: 6,
+        distancia_km: 1.4,
+        velocidad_kmh: 40,
+        destino: { lat: -33.6145, lng: -70.5765 },
+        posicion_actual: { lat: -33.605, lng: -70.577, rumbo: 180, indice_punto: 4 },
+      },
+      items: [
+        {
+          producto: { codigo: 'CL003', nombre: 'Cilindro gas licuado 15 kg', precio: 31990 },
+          cantidad: 1,
+          subtotal: 31990,
+        },
+      ],
+    }
+
+    const entrega = ventaAEntrega(ventaBackend)
+    expect(entrega.esDemo).toBe(false)
+    expect(entrega.ventaId).toBe(10)
+    expect(entrega.codigoVenta).toBe('EV-110')
+    expect(entrega.estado).toBe('en_camino')
+    expect(entrega.cliente.nombre).toBe('Camila Rojas')
+    expect(entrega.repartidor.nombre).toBe('Carlos Ruiz')
+    expect(entrega.posicionActual.lat).toBe(-33.605)
+    expect(entrega.etaMinutos).toBe(6)
+    expect(entrega.fechaVentaChile).toBe('2026-11-20T00:15:00-03:00')
   })
 
   it('debe actualizar la posición del repartidor y persistirla', () => {
@@ -44,7 +87,6 @@ describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
     expect(resultado.distanciaKm).toBe(1.5)
     expect(resultado.etaMinutos).toBe(5)
 
-    // Verificar lectura posterior
     const lectura = obtenerEntregaActiva()
     expect(lectura.posicionActual.lat).toBe(-33.605)
   })
@@ -70,17 +112,14 @@ describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
   })
 
   it('debe calcular el rumbo angular entre dos coordenadas correctamente', () => {
-    // Rumbo hacia el sur (latitud decrece a longitud constante)
     const rumboSur = calcularRumbo(-33.5, -70.5, -33.6, -70.5)
     expect(Math.round(rumboSur)).toBe(180)
 
-    // Rumbo hacia el norte (latitud crece a longitud constante)
     const rumboNorte = calcularRumbo(-33.6, -70.5, -33.5, -70.5)
     expect(Math.round(rumboNorte)).toBe(0)
   })
 
   it('debe entregar ruta de fallback si el servicio OSRM no responde o falla', async () => {
-    // Simular error de red en fetch
     vi.stubGlobal(
       'fetch',
       vi.fn().mockRejectedValue(new Error('Fallo simulado de red'))

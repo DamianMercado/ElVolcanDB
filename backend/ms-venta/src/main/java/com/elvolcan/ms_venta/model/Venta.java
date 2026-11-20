@@ -77,6 +77,13 @@ public class Venta {
     @Field("fecha_venta")
     private LocalDateTime fechaVenta;
 
+    @Field("fecha_venta_chile")
+    private String fechaVentaChile;
+
+    @Field("zona_horaria")
+    @Builder.Default
+    private String zonaHoraria = "America/Santiago";
+
     @Field("id_zona")
     private Integer idZona;
 
@@ -84,7 +91,8 @@ public class Venta {
     private Map<String, Object> entrega;
 
     @Field("auditoria")
-    private List<Map<String, Object>> auditoria;
+    @Builder.Default
+    private List<Map<String, Object>> auditoria = new ArrayList<>();
 
     @Field("items")
     @Builder.Default

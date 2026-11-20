@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useCarrito } from '../../context/Carrito.jsx'
-import { obtenerSesion, cerrarSesion } from '../../utils/token.js'
+import { useSesion } from '../../context/Sesion.jsx'
+import { obtenerSesion } from '../../utils/token.js'
 import { BotonCarritoNav } from './BotonCarritoNav.jsx'
 import { AccionesUsuarioNav } from './AccionesUsuarioNav.jsx'
 
@@ -12,6 +13,7 @@ export const Navbar = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { carrito, total } = useCarrito()
+  const { cerrar } = useSesion()
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false)
   const [usuario, setUsuario] = useState(() => obtenerSesion())
 
@@ -19,7 +21,6 @@ export const Navbar = () => {
     const sincronizarSesion = () => {
       setUsuario(obtenerSesion())
     }
-    sincronizarSesion()
 
     window.addEventListener('sesion_cambiada', sincronizarSesion)
     window.addEventListener('storage', sincronizarSesion)
@@ -39,7 +40,7 @@ export const Navbar = () => {
   }
 
   const cerrarSesionActiva = () => {
-    cerrarSesion()
+    cerrar()
     setUsuario(null)
     setMenuMovilAbierto(false)
     navigate('/')

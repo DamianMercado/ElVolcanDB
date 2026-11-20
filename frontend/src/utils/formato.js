@@ -1,6 +1,7 @@
 // Denominaciones oficiales en Chile
 export const BILLETES_CHILE = [20000, 10000, 5000, 2000, 1000]
 export const MONEDAS_CHILE = [500, 100, 50, 10]
+export const ZONA_HORARIA_CHILE = 'America/Santiago'
 
 const formateadorClp = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -26,15 +27,56 @@ export const estadoStock = (producto) => {
   return 'OK'
 }
 
-// Fecha de hoy en formato chileno: 17/10/2026
+const parsearFechaSegura = (valor) => {
+  if (!valor) return null
+  if (valor instanceof Date) {
+    return Number.isNaN(valor.getTime()) ? null : valor
+  }
+  const fecha = new Date(valor)
+  return Number.isNaN(fecha.getTime()) ? null : fecha
+}
+
+// Fecha de hoy en formato chileno (America/Santiago): 20/11/2026
 export const fechaDeHoy = () => {
   return new Date()
     .toLocaleDateString('es-CL', {
+      timeZone: ZONA_HORARIA_CHILE,
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     })
     .replaceAll('-', '/')
+}
+
+export const formatearFechaChile = (valor, fallback = '') => {
+  const fecha = parsearFechaSegura(valor)
+  if (!fecha) return fallback
+  return fecha
+    .toLocaleDateString('es-CL', {
+      timeZone: ZONA_HORARIA_CHILE,
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+    .replaceAll('-', '/')
+}
+
+export const formatearHoraChile = (valor, conSegundos = false) => {
+  const fecha = parsearFechaSegura(valor)
+  if (!fecha) return ''
+  return fecha.toLocaleTimeString('es-CL', {
+    timeZone: ZONA_HORARIA_CHILE,
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(conSegundos ? { second: '2-digit' } : {}),
+    hour12: false,
+  })
+}
+
+export const formatearFechaHoraChile = (valor) => {
+  const fecha = parsearFechaSegura(valor)
+  if (!fecha) return ''
+  return `${formatearFechaChile(fecha)} ${formatearHoraChile(fecha)}`
 }
 
 // Calcula sugerencias de montos con billetes y monedas

@@ -1,8 +1,12 @@
+process.env.TZ = 'America/Santiago';
 // Script para verificar conexión y cargar datos iniciales en MongoDB Atlas
 const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
+const horaChile = () =>
+  new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
 
 const uri = process.env.MONGO_URI;
 const dbName = process.env.MONGO_DB || 'el_volcan_db';

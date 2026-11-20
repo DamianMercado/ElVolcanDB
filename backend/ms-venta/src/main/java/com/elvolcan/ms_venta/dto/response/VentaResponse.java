@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
@@ -33,5 +34,9 @@ public class VentaResponse {
     private Long idPago;
     private String repartidor;
     private LocalDateTime fechaVenta;
+    private String fechaVentaChile;
+    private String zonaHoraria;
+    private Map<String, Object> entrega;
+    private List<Map<String, Object>> auditoria;
     private List<DetalleVentaResponse> items;
 }

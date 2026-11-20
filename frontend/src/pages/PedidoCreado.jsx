@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { obtenerUltimoPedido } from '../service/pedidoService.js'
-import { obtenerSesion } from '../utils/token.js'
+import { guardarEntregaActiva, ventaAEntrega } from '../service/repartoService.js'
+import { useSesion } from '../context/Sesion.jsx'
 import { EstadoVacio } from '../components/ui/EstadoVacio.jsx'
 import {
   EsqueletoRecibo,
@@ -15,12 +16,27 @@ import { ReciboTalonCorte } from '../components/recibo/ReciboTalonCorte.jsx'
 export function PedidoCreado() {
   const location = useLocation()
   const navigate = useNavigate()
-  const usuario = obtenerSesion()
+  const { usuario } = useSesion()
 
   const [pedido] = useState(() => {
     return location.state?.pedido || obtenerUltimoPedido()
   })
   const cargandoVista = useEsperaEsqueleto()
+
+  const irASeguimiento = () => {
+    if (pedido) {
+      const entrega = ventaAEntrega(pedido)
+      if (entrega) {
+        guardarEntregaActiva(entrega)
+      }
+      const destino = pedido.codigo || pedido.codigoVenta || pedido.id
+      if (destino) {
+        navigate(`/seguimiento/${encodeURIComponent(destino)}`)
+        return
+      }
+    }
+    navigate('/seguimiento')
+  }
 
   const numeroRecibo =
     String(pedido?.id || '').replace(/\D/g, '') || String(pedido?.id || '1')
@@ -97,7 +113,7 @@ export function PedidoCreado() {
           <button
             type="button"
             className="flex items-center gap-2 cursor-pointer rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-emerald-700 active:scale-95"
-            onClick={() => navigate('/seguimiento')}
+            onClick={irASeguimiento}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />

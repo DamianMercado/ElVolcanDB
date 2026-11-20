@@ -12,18 +12,50 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
+import org.springframework.data.convert.WritingConverter;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 
 @Configuration
 public class MongoInventarioConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MongoInventarioConfig.class);
+    private static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
+
+    @WritingConverter
+    public static class LocalDateTimeToDateChileConverter implements Converter<LocalDateTime, Date> {
+        @Override
+        public Date convert(LocalDateTime source) {
+            return Date.from(source.atZone(ZONA_CHILE).toInstant());
+        }
+    }
+
+    @ReadingConverter
+    public static class DateToLocalDateTimeChileConverter implements Converter<Date, LocalDateTime> {
+        @Override
+        public LocalDateTime convert(Date source) {
+            return LocalDateTime.ofInstant(source.toInstant(), ZONA_CHILE);
+        }
+    }
+
+    @Bean
+    public MongoCustomConversions mongoCustomConversions() {
+        return new MongoCustomConversions(List.of(
+                new LocalDateTimeToDateChileConverter(),
+                new DateToLocalDateTimeChileConverter()
+        ));
+    }
 
     @Bean
     public BeforeConvertCallback<Inventario> asignarIdSecuencialInventario(MongoTemplate mongoTemplate) {
@@ -59,7 +91,7 @@ public class MongoInventarioConfig {
         return args -> {
             try {
                 if (inventarioRepository.count() == 0) {
-                    log.info("Inicializando inventario en MongoDB Atlas (el_volcan_db)...");
+                    log.info("Inicializando inventario en MongoDB Atlas (el_volcan_db, TZ America/Santiago)...");
                     LocalDateTime fechaBase = LocalDateTime.of(2026, 10, 15, 10, 0);
                     List<Inventario> items = List.of(
                             crearInv(1L, "AC001", "Carro porta cilindro 11/15kg", 57, 15, "Bodega Central - Sector Accesorios", EstadoStock.OK, fechaBase),
@@ -81,6 +113,8 @@ public class MongoInventarioConfig {
                 }
 
                 if (movimientoRepository.count() == 0) {
+                    LocalDateTime fecha1 = LocalDateTime.of(2026, 10, 15, 12, 0);
+                    LocalDateTime fecha2 = LocalDateTime.of(2026, 10, 10, 9, 30);
                     List<MovimientoInventario> movimientos = List.of(
                             MovimientoInventario.builder()
                                     .id(1L)
@@ -92,7 +126,9 @@ public class MongoInventarioConfig {
                                     .stockNuevo(8)
                                     .observacion("Proveedor habitual")
                                     .estadoMovimiento(EstadoMovimiento.PENDIENTE)
-                                    .fechaMovimiento(LocalDateTime.of(2026, 10, 15, 12, 0))
+                                    .fechaMovimiento(fecha1)
+                                    .fechaMovimientoChile(fecha1.atZone(ZONA_CHILE).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                                    .zonaHoraria(ZONA_CHILE.getId())
                                     .build(),
                             MovimientoInventario.builder()
                                     .id(2L)
@@ -104,7 +140,9 @@ public class MongoInventarioConfig {
                                     .stockNuevo(30)
                                     .observacion("Reposición recibida de planta GLP")
                                     .estadoMovimiento(EstadoMovimiento.COMPLETADO)
-                                    .fechaMovimiento(LocalDateTime.of(2026, 10, 10, 9, 30))
+                                    .fechaMovimiento(fecha2)
+                                    .fechaMovimientoChile(fecha2.atZone(ZONA_CHILE).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                                    .zonaHoraria(ZONA_CHILE.getId())
                                     .build()
                     );
                     movimientoRepository.saveAll(movimientos);
@@ -128,6 +166,8 @@ public class MongoInventarioConfig {
                 .ubicacionBodega(ubicacion)
                 .estadoStock(estado)
                 .fechaActualizacion(fecha)
+                .fechaActualizacionChile(fecha.atZone(ZONA_CHILE).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .zonaHoraria(ZONA_CHILE.getId())
                 .build();
     }
 }

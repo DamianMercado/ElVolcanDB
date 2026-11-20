@@ -8,18 +8,50 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
+import org.springframework.data.convert.WritingConverter;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
 
 @Configuration
 public class MongoPagoConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MongoPagoConfig.class);
+    private static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
+
+    @WritingConverter
+    public static class LocalDateTimeToDateChileConverter implements Converter<LocalDateTime, Date> {
+        @Override
+        public Date convert(LocalDateTime source) {
+            return Date.from(source.atZone(ZONA_CHILE).toInstant());
+        }
+    }
+
+    @ReadingConverter
+    public static class DateToLocalDateTimeChileConverter implements Converter<Date, LocalDateTime> {
+        @Override
+        public LocalDateTime convert(Date source) {
+            return LocalDateTime.ofInstant(source.toInstant(), ZONA_CHILE);
+        }
+    }
+
+    @Bean
+    public MongoCustomConversions mongoCustomConversions() {
+        return new MongoCustomConversions(List.of(
+                new LocalDateTimeToDateChileConverter(),
+                new DateToLocalDateTimeChileConverter()
+        ));
+    }
 
     @Bean
     public BeforeConvertCallback<Pago> asignarIdSecuencialPago(MongoTemplate mongoTemplate) {
@@ -39,7 +71,7 @@ public class MongoPagoConfig {
         return args -> {
             try {
                 if (pagoRepository.count() == 0) {
-                    log.info("Inicializando transacciones de pago en MongoDB Atlas (el_volcan_db)...");
+                    log.info("Inicializando transacciones de pago en MongoDB Atlas (el_volcan_db, TZ America/Santiago)...");
                     List<Pago> pagos = List.of(
                             crearPago(1L, 1L, 36980.0, "webpay_debito", "TRX-582910", "AUT-194022", "0001", "maria.gomez@gmail.com", "MARIA GOMEZ", LocalDateTime.of(2026, 10, 20, 10, 16)),
                             crearPago(2L, 3L, 49970.0, "webpay_credito", "TRX-748201", "AUT-839201", "0001", "ana.torres@gmail.com", "ANA TORRES", LocalDateTime.of(2026, 10, 19, 16, 32)),
@@ -70,6 +102,8 @@ public class MongoPagoConfig {
                 .emailComprobante(email)
                 .nombreTitular(titular)
                 .fechaPago(fecha)
+                .fechaPagoChile(fecha.atZone(ZONA_CHILE).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .zonaHoraria(ZONA_CHILE.getId())
                 .build();
     }
 }

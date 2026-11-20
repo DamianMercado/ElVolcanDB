@@ -43,4 +43,11 @@ public class Inventario {
 
     @Field("fecha_actualizacion")
     private LocalDateTime fechaActualizacion;
+
+    @Field("fecha_actualizacion_chile")
+    private String fechaActualizacionChile;
+
+    @Field("zona_horaria")
+    @Builder.Default
+    private String zonaHoraria = "America/Santiago";
 }

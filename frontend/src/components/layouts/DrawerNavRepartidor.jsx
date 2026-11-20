@@ -1,19 +1,30 @@
 import { useNavigate } from 'react-router-dom'
 import { useCarrito } from '../../context/Carrito.jsx'
-import { obtenerSesion, cerrarSesion } from '../../utils/token.js'
+import { useSesion } from '../../context/Sesion.jsx'
 
 const logoVolcan =
   'https://res.cloudinary.com/hsr9lgyw/image/upload/elVolcan.svg'
 
 export function DrawerNavRepartidor({ abierto, alCerrar }) {
   const navigate = useNavigate()
-  const { carrito, total } = useCarrito()
-  const usuario = obtenerSesion()
+  const { carrito } = useCarrito()
+  const { usuario, cerrar } = useSesion()
   const cantidadTotal = carrito.reduce((acc, item) => acc + item.cantidad, 0)
   const esAdmin =
     String(usuario?.rol || usuario?.perfil || '').toLowerCase() === 'admin'
 
   if (!abierto) return null
+
+  const nombreVisible = usuario
+    ? `${usuario.nombres || usuario.nombre || ''} ${usuario.apellidos || ''}`.trim() ||
+      'Repartidor El Volcán'
+    : 'Carlos Ruiz (Demo)'
+  const iniciales = nombreVisible
+    .split(' ')
+    .map((p) => p[0] || '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
   const irA = (ruta) => {
     alCerrar()
@@ -21,7 +32,7 @@ export function DrawerNavRepartidor({ abierto, alCerrar }) {
   }
 
   const manejarCerrarSesion = () => {
-    cerrarSesion()
+    cerrar()
     alCerrar()
     navigate('/')
   }
@@ -69,17 +80,17 @@ export function DrawerNavRepartidor({ abierto, alCerrar }) {
         <div className="border-b border-white/10 bg-white/5 p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2171ec] text-base font-bold text-white shadow">
-              CS
+              {iniciales}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-bold text-white">
-                Carlos Silva Morales
+                {nombreVisible}
               </p>
               <p className="text-xs text-emerald-400 font-semibold">
                 ● Conductor Repartidor Activo
               </p>
               <p className="text-[11px] text-white/50">
-                Furgón Hyundai H-100 (BV-9281)
+                {usuario?.email || 'Furgón Hyundai H-100 (KJ-WP-42)'}
               </p>
             </div>
           </div>

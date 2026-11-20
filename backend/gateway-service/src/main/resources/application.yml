@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: gateway-service
+  jackson:
+    time-zone: America/Santiago
 
   cloud:
     gateway:

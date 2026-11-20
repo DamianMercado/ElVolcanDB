@@ -14,9 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -26,6 +27,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class PagoService {
 
     private static final Logger log = LoggerFactory.getLogger(PagoService.class);
+    public static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
 
     private final PagoRepository pagoRepository;
     private final PagoMapper pagoMapper;
@@ -35,6 +37,9 @@ public class PagoService {
     public void autenticarConMsAuth(String authHeader) {
         if (authHeader != null && !authHeader.isBlank()) {
             String token = authHeader.replace("Bearer ", "").trim();
+            if (token.isBlank() || "null".equalsIgnoreCase(token) || "undefined".equalsIgnoreCase(token)) {
+                throw new SecurityException("Token inválido o vacío");
+            }
             try {
                 Map<String, Object> validacion = authClient.validarToken(token);
                 if (validacion == null || !Boolean.TRUE.equals(validacion.get("valido"))) {
@@ -48,25 +53,21 @@ public class PagoService {
         }
     }
 
-    @Transactional(readOnly = true)
     public List<PagoResponse> listarPagos() {
         log.info("Listando todos los pagos");
         return pagoMapper.toResponseList(pagoRepository.findAll());
     }
 
-    @Transactional(readOnly = true)
     public PagoResponse obtenerPorId(Long id) {
         Pago pago = pagoRepository.findById(id)
                 .orElseThrow(() -> new PagoNoEncontradoException(id));
         return pagoMapper.toResponse(pago);
     }
 
-    @Transactional(readOnly = true)
     public List<PagoResponse> obtenerPorVenta(Long idVenta) {
         return pagoMapper.toResponseList(pagoRepository.findByIdVenta(idVenta));
     }
 
-    @Transactional
     public PagoResponse procesarPago(PagoRequest request) {
         log.info("Procesando pago para la venta ID: {}", request.getIdVenta());
 
@@ -76,16 +77,20 @@ public class PagoService {
             throw new IllegalArgumentException("No existe la venta con ID: " + request.getIdVenta());
         }
 
+        ZonedDateTime ahoraChile = ZonedDateTime.now(ZONA_CHILE);
         Pago pago = pagoMapper.toEntity(request);
         pago.setCodigoTransaccion("TRX-" + ThreadLocalRandom.current().nextInt(100000, 999999));
         pago.setCodigoAutorizacion("AUT-" + ThreadLocalRandom.current().nextInt(100000, 999999));
-        pago.setFechaPago(LocalDateTime.now());
+        pago.setFechaPago(ahoraChile.toLocalDateTime());
+        pago.setFechaPagoChile(ahoraChile.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        pago.setZonaHoraria(ZONA_CHILE.getId());
 
         boolean aprobar = request.getAprobarInmediatamente() == null || request.getAprobarInmediatamente();
         pago.setEstadoPago(aprobar ? EstadoPago.PAGADO : EstadoPago.PENDIENTE);
 
         Pago guardado = pagoRepository.save(pago);
-        log.info("Pago registrado con ID: {} y estado: {}", guardado.getId(), guardado.getEstadoPago().getValor());
+        log.info("Pago registrado con ID: {}, estado: {}, hora Chile: {}",
+                guardado.getId(), guardado.getEstadoPago().getValor(), guardado.getFechaPagoChile());
 
         if (guardado.getEstadoPago() == EstadoPago.PAGADO) {
             notificarVenta(guardado);
@@ -94,7 +99,6 @@ public class PagoService {
         return pagoMapper.toResponse(guardado);
     }
 
-    @Transactional
     public PagoResponse validarPago(Long id) {
         log.info("Validando pago ID: {}", id);
         Pago pago = pagoRepository.findById(id)
@@ -107,7 +111,11 @@ public class PagoService {
             throw new IllegalStateException("No se puede validar un pago reembolsado");
         }
 
+        ZonedDateTime ahoraChile = ZonedDateTime.now(ZONA_CHILE);
         pago.setEstadoPago(EstadoPago.PAGADO);
+        pago.setFechaPago(ahoraChile.toLocalDateTime());
+        pago.setFechaPagoChile(ahoraChile.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
+        pago.setZonaHoraria(ZONA_CHILE.getId());
         Pago actualizado = pagoRepository.save(pago);
 
         notificarVenta(actualizado);
@@ -123,7 +131,6 @@ public class PagoService {
         }
     }
 
-    @Transactional
     public PagoResponse reembolsarPago(Long id) {
         Pago pago = pagoRepository.findById(id)
                 .orElseThrow(() -> new PagoNoEncontradoException(id));
@@ -136,7 +143,6 @@ public class PagoService {
         return pagoMapper.toResponse(pagoRepository.save(pago));
     }
 
-    @Transactional
     public void eliminarPago(Long id) {
         Pago pago = pagoRepository.findById(id)
                 .orElseThrow(() -> new PagoNoEncontradoException(id));

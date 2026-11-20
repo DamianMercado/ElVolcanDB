@@ -29,7 +29,7 @@ public class AuthController {
     @Operation(summary = "Iniciar sesión y obtener token de autenticación")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Inicio de sesión exitoso"),
-            @ApiResponse(responseCode = "400", description = "Credenciales inválidas")
+            @ApiResponse(responseCode = "401", description = "Credenciales inválidas")
     })
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
@@ -53,9 +53,12 @@ public class AuthController {
     }
 
     @GetMapping("/validar")
-    @Operation(summary = "Validar un token de autenticación (usado por todos los microservicios)")
-    public ResponseEntity<ValidacionAuthResponse> validarToken(@RequestParam("token") String token) {
-        return ResponseEntity.ok(authService.validarToken(token));
+    @Operation(summary = "Validar un token de autenticación (acepta parámetro token o cabecera Authorization)")
+    public ResponseEntity<ValidacionAuthResponse> validarToken(
+            @RequestParam(value = "token", required = false) String token,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String tokenEfectivo = (token != null && !token.isBlank()) ? token : authHeader;
+        return ResponseEntity.ok(authService.validarToken(tokenEfectivo));
     }
 
     @GetMapping("/validar-usuario/{idUsuario}")
@@ -65,9 +68,12 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Cerrar sesión invalidando el token")
-    public ResponseEntity<AuthResponse> logout(@RequestParam("token") String token) {
-        return ResponseEntity.ok(authService.cerrarSesion(token));
+    @Operation(summary = "Cerrar sesión invalidando el token (acepta parámetro token o cabecera Authorization)")
+    public ResponseEntity<AuthResponse> logout(
+            @RequestParam(value = "token", required = false) String token,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String tokenEfectivo = (token != null && !token.isBlank()) ? token : authHeader;
+        return ResponseEntity.ok(authService.cerrarSesion(tokenEfectivo));
     }
 
     @GetMapping("/sesiones")

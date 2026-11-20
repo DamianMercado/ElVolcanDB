@@ -25,4 +25,6 @@ public class MovimientoInventarioResponse {
     private String observacion;
     private EstadoMovimiento estadoMovimiento;
     private LocalDateTime fechaMovimiento;
+    private String fechaMovimientoChile;
+    private String zonaHoraria;
 }

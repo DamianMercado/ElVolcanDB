@@ -22,4 +22,6 @@ public class InventarioResponse {
     private String ubicacionBodega;
     private EstadoStock estadoStock;
     private LocalDateTime fechaActualizacion;
+    private String fechaActualizacionChile;
+    private String zonaHoraria;
 }

@@ -17,9 +17,12 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,14 +31,17 @@ import java.util.Optional;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    public static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
 
     private final SesionAuthRepository sesionAuthRepository;
     private final AuthMapper authMapper;
     private final UsuarioClient usuarioClient;
     private final JwtUtil jwtUtil;
 
-    @Transactional
     public AuthResponse login(LoginRequest request) {
+        if (request.getEmail() != null) {
+            request.setEmail(request.getEmail().trim().toLowerCase());
+        }
         log.info("Iniciando sesión con JWT en ms-auth para el correo: {}", request.getEmail());
 
         UsuarioExternoResponse usuario;
@@ -43,14 +49,16 @@ public class AuthService {
             usuario = usuarioClient.validarCredenciales(request);
         } catch (Exception e) {
             log.error("Error al validar credenciales contra ms-usuario: {}", e.getMessage());
-            throw new IllegalArgumentException("Credenciales inválidas o usuario no encontrado");
+            throw new IllegalArgumentException("Correo o contraseña incorrectos");
         }
 
         return generarSesionJwtParaUsuario(usuario);
     }
 
-    @Transactional
     public AuthResponse recuperarClave(LoginRequest request) {
+        if (request.getEmail() != null) {
+            request.setEmail(request.getEmail().trim().toLowerCase());
+        }
         log.info("Recuperando/actualizando contraseña en ms-auth para: {}", request.getEmail());
         UsuarioExternoResponse usuario;
         try {
@@ -59,11 +67,16 @@ public class AuthService {
             log.error("Error al restablecer contraseña en ms-usuario: {}", e.getMessage());
             throw new IllegalArgumentException("No se encontró una cuenta con el correo indicado o no se pudo actualizar la clave");
         }
+
+        // Revocar sesiones activas previas tras cambio de contraseña por seguridad
+        revocarSesionesActivasUsuario(usuario.getId());
         return generarSesionJwtParaUsuario(usuario);
     }
 
-    @Transactional
     public AuthResponse registrarYAutenticar(RegistroAuthRequest request) {
+        if (request.getEmail() != null) {
+            request.setEmail(request.getEmail().trim().toLowerCase());
+        }
         log.info("Registrando nuevo usuario desde ms-auth: {}", request.getEmail());
 
         if (request.getRol() == null || request.getRol().isBlank()) {
@@ -75,39 +88,78 @@ public class AuthService {
             usuarioCreado = usuarioClient.registrarUsuario(request);
         } catch (Exception e) {
             log.error("Error al registrar usuario en ms-usuario: {}", e.getMessage());
-            throw new IllegalArgumentException("No se pudo registrar el usuario: " + e.getMessage());
+            throw new IllegalArgumentException("No se pudo registrar el usuario: " + extraerMensajeLimpio(e.getMessage()));
         }
 
         return generarSesionJwtParaUsuario(usuarioCreado);
     }
 
+    private void revocarSesionesActivasUsuario(Long idUsuario) {
+        if (idUsuario == null) {
+            return;
+        }
+        List<SesionAuth> activas = sesionAuthRepository.findByIdUsuarioAndEstado(idUsuario, EstadoSesion.ACTIVA);
+        if (!activas.isEmpty()) {
+            for (SesionAuth sesion : activas) {
+                sesion.setEstado(EstadoSesion.CERRADA);
+            }
+            sesionAuthRepository.saveAll(activas);
+            log.info("Revocadas {} sesiones activas previas del usuario ID {}", activas.size(), idUsuario);
+        }
+    }
+
+    private String extraerMensajeLimpio(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "Verifica que el correo y RUT no estén registrados.";
+        }
+        if (raw.contains("ya está registrado")) {
+            int idx = raw.indexOf("El ");
+            if (idx >= 0) {
+                String recorte = raw.substring(idx);
+                int fin = recorte.indexOf("\"");
+                return fin > 0 ? recorte.substring(0, fin) : recorte;
+            }
+        }
+        return raw;
+    }
+
     private AuthResponse generarSesionJwtParaUsuario(UsuarioExternoResponse usuario) {
-        LocalDateTime ahora = LocalDateTime.now();
-        String nombreCompleto = (usuario.getNombre() + " " + usuario.getApellido()).trim();
-        String jwtToken = jwtUtil.generarToken(
-                usuario.getId(),
-                nombreCompleto,
-                usuario.getEmail(),
-                usuario.getRol()
-        );
+        ZonedDateTime ahoraChile = ZonedDateTime.now(ZONA_CHILE);
+        ZonedDateTime expiracionChile = ahoraChile.plus(Duration.ofMillis(jwtUtil.getExpirationMs()));
+        LocalDateTime ahora = ahoraChile.toLocalDateTime();
+        LocalDateTime expiracion = expiracionChile.toLocalDateTime();
+
+        String nombre = usuario.getNombre() != null ? usuario.getNombre().trim() : "";
+        String apellido = usuario.getApellido() != null ? usuario.getApellido().trim() : "";
+        String nombreCompleto = (nombre + " " + apellido).trim();
+        String jwtToken = jwtUtil.generarToken(usuario);
 
         SesionAuth sesion = SesionAuth.builder()
                 .idUsuario(usuario.getId())
+                .nombre(nombre)
+                .apellido(apellido)
                 .nombreUsuario(nombreCompleto)
                 .email(usuario.getEmail())
+                .rut(usuario.getRut())
+                .telefono(usuario.getTelefono())
+                .direccion(usuario.getDireccion())
+                .comuna(usuario.getComuna())
                 .rol(usuario.getRol())
                 .token(jwtToken)
                 .fechaInicio(ahora)
-                .fechaExpiracion(ahora.plusHours(24))
+                .fechaExpiracion(expiracion)
+                .fechaInicioChile(ahoraChile.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .fechaExpiracionChile(expiracionChile.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .zonaHoraria(ZONA_CHILE.getId())
                 .estado(EstadoSesion.ACTIVA)
                 .build();
 
         SesionAuth guardada = sesionAuthRepository.save(sesion);
-        log.info("Sesión JWT creada exitosamente en ms-auth con ID: {}", guardada.getId());
+        log.info("Sesión JWT creada en ms-auth (ID sesión: {}, ID usuario: {}, hora Chile: {})",
+                guardada.getId(), guardada.getIdUsuario(), guardada.getFechaInicioChile());
         return authMapper.toResponse(guardada);
     }
 
-    @Transactional
     public ValidacionAuthResponse validarToken(String token) {
         log.info("Validando token JWT en ms-auth");
 
@@ -119,10 +171,17 @@ public class AuthService {
         }
 
         String tokenLimpio = token.replace("Bearer ", "").trim();
+        LocalDateTime ahoraChile = LocalDateTime.now(ZONA_CHILE);
 
         // 1. Verificar firma criptográfica JWT si es un JWT estándar (contiene 2 puntos)
         if (tokenLimpio.chars().filter(ch -> ch == '.').count() == 2) {
             if (!jwtUtil.validarTokenCriptografico(tokenLimpio)) {
+                sesionAuthRepository.findByToken(tokenLimpio).ifPresent(s -> {
+                    if (s.getEstado() == EstadoSesion.ACTIVA) {
+                        s.setEstado(EstadoSesion.EXPIRADA);
+                        sesionAuthRepository.save(s);
+                    }
+                });
                 return ValidacionAuthResponse.builder()
                         .valido(false)
                         .token(tokenLimpio)
@@ -143,6 +202,18 @@ public class AuthService {
                             .mensaje("La sesión JWT fue cerrada o revocada")
                             .build();
                 }
+                if (sesion.getFechaExpiracion() != null && sesion.getFechaExpiracion().isBefore(ahoraChile)) {
+                    sesion.setEstado(EstadoSesion.EXPIRADA);
+                    sesionAuthRepository.save(sesion);
+                    return ValidacionAuthResponse.builder()
+                            .valido(false)
+                            .idUsuario(sesion.getIdUsuario())
+                            .email(sesion.getEmail())
+                            .rol(sesion.getRol())
+                            .token(tokenLimpio)
+                            .mensaje("La sesión JWT ha expirado")
+                            .build();
+                }
             }
 
             Claims claims = jwtUtil.extraerClaims(tokenLimpio);
@@ -158,7 +229,7 @@ public class AuthService {
                     .build();
         }
 
-        // 2. Respaldo para sesiones registradas en tabla sesion_auth
+        // 2. Respaldo para sesiones registradas en colección sesion_auth
         Optional<SesionAuth> sesionOpt = sesionAuthRepository.findByToken(tokenLimpio);
         if (sesionOpt.isEmpty()) {
             return ValidacionAuthResponse.builder()
@@ -180,7 +251,7 @@ public class AuthService {
                     .build();
         }
 
-        if (sesion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+        if (sesion.getFechaExpiracion() != null && sesion.getFechaExpiracion().isBefore(ahoraChile)) {
             sesion.setEstado(EstadoSesion.EXPIRADA);
             sesionAuthRepository.save(sesion);
             return ValidacionAuthResponse.builder()
@@ -204,22 +275,23 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional(readOnly = true)
     public ValidacionAuthResponse validarUsuarioAutenticado(Long idUsuario) {
         log.info("Validando usuario ID {} en ms-auth", idUsuario);
 
+        LocalDateTime ahoraChile = LocalDateTime.now(ZONA_CHILE);
         List<SesionAuth> sesionesActivas = sesionAuthRepository.findByIdUsuarioAndEstado(idUsuario, EstadoSesion.ACTIVA);
-        if (!sesionesActivas.isEmpty()) {
-            SesionAuth sesion = sesionesActivas.get(0);
-            return ValidacionAuthResponse.builder()
-                    .valido(true)
-                    .idUsuario(sesion.getIdUsuario())
-                    .nombreUsuario(sesion.getNombreUsuario())
-                    .email(sesion.getEmail())
-                    .rol(sesion.getRol())
-                    .token(sesion.getToken())
-                    .mensaje("Usuario autenticado con sesión JWT activa en ms-auth")
-                    .build();
+        for (SesionAuth sesion : sesionesActivas) {
+            if (sesion.getFechaExpiracion() == null || !sesion.getFechaExpiracion().isBefore(ahoraChile)) {
+                return ValidacionAuthResponse.builder()
+                        .valido(true)
+                        .idUsuario(sesion.getIdUsuario())
+                        .nombreUsuario(sesion.getNombreUsuario())
+                        .email(sesion.getEmail())
+                        .rol(sesion.getRol())
+                        .token(sesion.getToken())
+                        .mensaje("Usuario autenticado con sesión JWT activa en ms-auth")
+                        .build();
+            }
         }
 
         try {
@@ -241,23 +313,33 @@ public class AuthService {
         }
     }
 
-    @Transactional
     public AuthResponse cerrarSesion(String token) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("Debe proporcionar un token para cerrar sesión");
+        }
         String tokenLimpio = token.replace("Bearer ", "").trim();
-        SesionAuth sesion = sesionAuthRepository.findByToken(tokenLimpio)
-                .orElseThrow(() -> new SesionNoEncontradaException("No se encontró sesión con el token JWT indicado"));
+        Optional<SesionAuth> sesionOpt = sesionAuthRepository.findByToken(tokenLimpio);
 
+        if (sesionOpt.isEmpty()) {
+            log.info("Logout solicitado para token sin sesión activa en BD; se responde cierre idempotente.");
+            return AuthResponse.builder()
+                    .token(tokenLimpio)
+                    .estado(EstadoSesion.CERRADA)
+                    .zonaHoraria(ZONA_CHILE.getId())
+                    .build();
+        }
+
+        SesionAuth sesion = sesionOpt.get();
         sesion.setEstado(EstadoSesion.CERRADA);
         SesionAuth actualizada = sesionAuthRepository.save(sesion);
+        log.info("Sesión ID {} (usuario {}) marcada como CERRADA", actualizada.getId(), actualizada.getIdUsuario());
         return authMapper.toResponse(actualizada);
     }
 
-    @Transactional(readOnly = true)
     public List<AuthResponse> obtenerTodasLasSesiones() {
         return authMapper.toResponseList(sesionAuthRepository.findAll());
     }
 
-    @Transactional(readOnly = true)
     public AuthResponse obtenerSesionPorId(Long id) {
         SesionAuth sesion = sesionAuthRepository.findById(id)
                 .orElseThrow(() -> new SesionNoEncontradaException(id));

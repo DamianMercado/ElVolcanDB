@@ -4,28 +4,23 @@ import {
   realizarPeticion,
   obtenerMensaje,
 } from './endpoints'
-import { fechaDeHoy } from '../utils/formato'
+import { fechaDeHoy, formatearFechaChile } from '../utils/formato'
 
 const obtenerHeadersAuth = (conJson = false) => {
   const token = localStorage.getItem(Variables.tokenKey)
   const headers = { Accept: 'application/json' }
   if (conJson) headers['Content-Type'] = 'application/json'
-  if (token) headers.Authorization = `Bearer ${token}`
+  if (token && token !== 'null' && token !== 'undefined') {
+    headers.Authorization = `Bearer ${token}`
+  }
   return headers
 }
 
 const normalizarMovimiento = (m) => {
-  const fechaObj = m.fechaMovimiento ? new Date(m.fechaMovimiento) : null
-  const fechaFormateada =
-    fechaObj && !Number.isNaN(fechaObj.getTime())
-      ? fechaObj
-          .toLocaleDateString('es-CL', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-          })
-          .replaceAll('-', '/')
-      : m.fecha || fechaDeHoy()
+  const fechaFuente = m.fechaMovimientoChile || m.fechaMovimiento
+  const fechaFormateada = fechaFuente
+    ? formatearFechaChile(fechaFuente, m.fecha || fechaDeHoy())
+    : m.fecha || fechaDeHoy()
 
   return {
     id: m.id ?? m.idMovimiento,

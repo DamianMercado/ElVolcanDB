@@ -25,11 +25,29 @@ public class SesionAuth {
     @Field("id_usuario")
     private Long idUsuario;
 
+    @Field("nombre")
+    private String nombre;
+
+    @Field("apellido")
+    private String apellido;
+
     @Field("nombre_usuario")
     private String nombreUsuario;
 
     @Field("email")
     private String email;
+
+    @Field("rut")
+    private String rut;
+
+    @Field("telefono")
+    private String telefono;
+
+    @Field("direccion")
+    private String direccion;
+
+    @Field("comuna")
+    private String comuna;
 
     @Field("rol")
     private String rol;
@@ -43,6 +61,16 @@ public class SesionAuth {
 
     @Field("fecha_expiracion")
     private LocalDateTime fechaExpiracion;
+
+    @Field("fecha_inicio_chile")
+    private String fechaInicioChile;
+
+    @Field("fecha_expiracion_chile")
+    private String fechaExpiracionChile;
+
+    @Field("zona_horaria")
+    @Builder.Default
+    private String zonaHoraria = "America/Santiago";
 
     @Field("estado")
     private EstadoSesion estado;

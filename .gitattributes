@@ -1,0 +1,10 @@
+# Normalización de saltos de línea para compatibilidad Windows <-> Linux (AWS EC2 / Docker)
+* text=auto
+*.sh text eol=lf
+mvnw text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.properties text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

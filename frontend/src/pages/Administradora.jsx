@@ -23,6 +23,7 @@ import { ListarProductos } from '../service/productoService.js'
 import {
   ListarPedidosServicio,
   asignarRepartidorPedido,
+  cancelarPedido,
 } from '../service/pedidoService.js'
 
 export function Administradora() {
@@ -138,6 +139,15 @@ export function Administradora() {
     )
   }
 
+  async function manejarCancelarPedido(idPedido) {
+    const pedidoCancelado = await cancelarPedido(idPedido)
+    setPedidos((anteriores) =>
+      anteriores.map((p) =>
+        String(p.id) === String(idPedido) ? pedidoCancelado : p
+      )
+    )
+  }
+
   return (
     <div className="min-h-[calc(100vh-140px)] bg-[#f4f7fb] px-4 py-7 text-[#1f2d3d] md:px-6">
       <div className="mx-auto max-w-[1150px]">
@@ -198,6 +208,7 @@ export function Administradora() {
               pedidos={pedidos}
               repartidores={repartidores}
               alAsignar={asignarRepartidor}
+              alCancelar={manejarCancelarPedido}
             />
           )}
         </section>

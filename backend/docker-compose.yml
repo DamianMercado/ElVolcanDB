@@ -1,7 +1,7 @@
 services:
   # ==================== MONGODB (RESPALDO LOCAL / ATLAS CLOUD) ====================
-  # Si defines MONGO_URI=mongodb+srv://... en un archivo .env en esta carpeta,
-  # todos los microservicios se conectarán directamente a tu cluster de MongoDB Atlas.
+  # Si defines MONGO_URI=mongodb+srv://... en backend/.env, todos los microservicios
+  # se conectarán directamente a tu cluster de MongoDB Atlas.
 
   mongodb:
     image: mongo:7.0
@@ -9,7 +9,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_DATABASE: el_volcan_db
+      TZ: ${TZ:-America/Santiago}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-el_volcan_db}
     volumes:
       - mongodb_data:/data/db
       - ./mongodb/volcan_mongodb_setup.js:/docker-entrypoint-initdb.d/volcan_mongodb_setup.js:ro
@@ -20,6 +21,7 @@ services:
       retries: 10
     networks:
       - elvolcan-net
+    restart: unless-stopped
 
   # ==================== EUREKA SERVER ====================
 
@@ -31,7 +33,14 @@ services:
     ports:
       - "8761:8761"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     networks:
       - elvolcan-net
     restart: unless-stopped
@@ -46,9 +55,16 @@ services:
     ports:
       - "8080:8080"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-*}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       eureka-server:
         condition: service_started
@@ -66,11 +82,12 @@ services:
     ports:
       - "8081:8081"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -88,11 +105,13 @@ services:
     ports:
       - "8082:8082"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -112,11 +131,12 @@ services:
     ports:
       - "8083:8083"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -136,11 +156,12 @@ services:
     ports:
       - "8084:8084"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -162,11 +183,12 @@ services:
     ports:
       - "8085:8085"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -190,11 +212,12 @@ services:
     ports:
       - "8086:8086"
     environment:
+      - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
-      - EUREKA_URL=http://eureka-server:8761/eureka/
+      - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
       - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
-      - JWT_SECRET=ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456
+      - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
       mongodb:
         condition: service_healthy

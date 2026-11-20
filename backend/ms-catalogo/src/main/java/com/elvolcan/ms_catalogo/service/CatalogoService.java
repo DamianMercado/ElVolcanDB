@@ -35,6 +35,9 @@ public class CatalogoService {
     public void autenticarConMsAuth(String authHeader) {
         if (authHeader != null && !authHeader.isBlank()) {
             String token = authHeader.replace("Bearer ", "").trim();
+            if (token.isBlank() || "null".equalsIgnoreCase(token) || "undefined".equalsIgnoreCase(token)) {
+                throw new SecurityException("Token inválido o vacío");
+            }
             try {
                 Map<String, Object> validacion = authClient.validarToken(token);
                 if (validacion == null || !Boolean.TRUE.equals(validacion.get("valido"))) {

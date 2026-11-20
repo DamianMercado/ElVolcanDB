@@ -14,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -30,9 +29,16 @@ public class UsuarioService {
     private final PasswordEncoder passwordEncoder;
     private final AuthClient authClient;
 
+    private String normalizarEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
+    }
+
     public void verificarTokenSiPresente(String authHeader) {
         if (authHeader != null && !authHeader.isBlank()) {
             String token = authHeader.replace("Bearer ", "").trim();
+            if (token.isBlank() || "null".equalsIgnoreCase(token) || "undefined".equalsIgnoreCase(token)) {
+                throw new SecurityException("Token inválido o vacío");
+            }
             try {
                 Map<String, Object> resultado = authClient.validarToken(token);
                 if (resultado == null || !Boolean.TRUE.equals(resultado.get("valido"))) {
@@ -46,13 +52,11 @@ public class UsuarioService {
         }
     }
 
-    @Transactional(readOnly = true)
     public List<UsuarioResponse> obtenerTodos() {
         log.info("Obteniendo todos los usuarios");
         return usuarioMapper.toResponseList(usuarioRepository.findAll());
     }
 
-    @Transactional(readOnly = true)
     public UsuarioResponse obtenerPorId(Long id) {
         log.info("Buscando usuario con ID: {}", id);
         Usuario usuario = usuarioRepository.findById(id)
@@ -60,44 +64,50 @@ public class UsuarioService {
         return usuarioMapper.toResponse(usuario);
     }
 
-    @Transactional(readOnly = true)
     public UsuarioResponse obtenerPorEmail(String email) {
-        log.info("Buscando usuario con email: {}", email);
-        Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new UsuarioNoEncontradoException("Usuario no encontrado con email: " + email));
+        String emailNormalizado = normalizarEmail(email);
+        log.info("Buscando usuario con email: {}", emailNormalizado);
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
+                .orElseThrow(() -> new UsuarioNoEncontradoException("Usuario no encontrado con email: " + emailNormalizado));
         return usuarioMapper.toResponse(usuario);
     }
 
-    @Transactional(readOnly = true)
     public UsuarioResponse obtenerPorRut(String rut) {
-        log.info("Buscando usuario con RUT: {}", rut);
-        Usuario usuario = usuarioRepository.findByRut(rut)
-                .orElseThrow(() -> new UsuarioNoEncontradoException("Usuario no encontrado con RUT: " + rut));
+        String rutLimpio = rut != null ? rut.trim() : "";
+        log.info("Buscando usuario con RUT: {}", rutLimpio);
+        Usuario usuario = usuarioRepository.findByRut(rutLimpio)
+                .orElseThrow(() -> new UsuarioNoEncontradoException("Usuario no encontrado con RUT: " + rutLimpio));
         return usuarioMapper.toResponse(usuario);
     }
 
-    @Transactional(readOnly = true)
     public List<UsuarioResponse> obtenerPorRol(RolUsuario rol) {
         log.info("Buscando usuarios por rol: {}", rol);
         return usuarioMapper.toResponseList(usuarioRepository.findByRol(rol));
     }
 
-    @Transactional
     public UsuarioResponse crear(UsuarioRequest request) {
+        String emailNormalizado = normalizarEmail(request.getEmail());
+        String rutLimpio = request.getRut() != null ? request.getRut().trim() : "";
+
         log.info("Creando usuario con email: {} - Rol: {}",
-                request.getEmail(),
+                emailNormalizado,
                 request.getRol() != null ? request.getRol().getValor() : "null");
 
-        if (usuarioRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("El email '" + request.getEmail() + "' ya está registrado");
+        if (usuarioRepository.existsByEmail(emailNormalizado)) {
+            throw new IllegalArgumentException("El email '" + emailNormalizado + "' ya está registrado");
         }
 
-        if (usuarioRepository.existsByRut(request.getRut())) {
-            throw new IllegalArgumentException("El RUT '" + request.getRut() + "' ya está registrado");
+        if (!rutLimpio.isBlank() && usuarioRepository.existsByRut(rutLimpio)) {
+            throw new IllegalArgumentException("El RUT '" + rutLimpio + "' ya está registrado");
         }
 
         Usuario usuario = usuarioMapper.toEntity(request);
+        usuario.setEmail(emailNormalizado);
+        usuario.setRut(rutLimpio);
         usuario.setPassword(passwordEncoder.encode(request.getPassword()));
+        if (usuario.getActivo() == null) {
+            usuario.setActivo(true);
+        }
 
         Usuario guardado = usuarioRepository.save(usuario);
         log.info("Usuario creado correctamente con ID: {} - Rol: {}",
@@ -107,7 +117,6 @@ public class UsuarioService {
         return usuarioMapper.toResponse(guardado);
     }
 
-    @Transactional
     public UsuarioResponse actualizar(Long id, UsuarioRequest request) {
         log.info("Actualizando usuario con ID: {}", id);
 
@@ -116,8 +125,8 @@ public class UsuarioService {
 
         usuario.setNombre(request.getNombre());
         usuario.setApellido(request.getApellido());
-        usuario.setEmail(request.getEmail());
-        usuario.setRut(request.getRut());
+        usuario.setEmail(normalizarEmail(request.getEmail()));
+        usuario.setRut(request.getRut() != null ? request.getRut().trim() : usuario.getRut());
         usuario.setTelefono(request.getTelefono());
         usuario.setDireccion(request.getDireccion());
         usuario.setComuna(request.getComuna());
@@ -131,7 +140,6 @@ public class UsuarioService {
         return usuarioMapper.toResponse(actualizado);
     }
 
-    @Transactional
     public void eliminar(Long id) {
         log.info("Eliminando usuario con ID: {}", id);
         Usuario usuario = usuarioRepository.findById(id)
@@ -139,34 +147,42 @@ public class UsuarioService {
         usuarioRepository.delete(usuario);
     }
 
-    @Transactional(readOnly = true)
     public UsuarioResponse validarCredenciales(CredencialesRequest request) {
-        log.info("Validando credenciales para email: {}", request.getEmail());
-        Usuario usuario = usuarioRepository.findByEmail(request.getEmail().trim().toLowerCase())
+        String emailNormalizado = normalizarEmail(request.getEmail());
+        log.info("Validando credenciales para email: {}", emailNormalizado);
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
                 .orElseThrow(() -> new IllegalArgumentException("Correo o contraseña incorrectos"));
 
-        boolean coincide = passwordEncoder.matches(request.getPassword(), usuario.getPassword())
-                || usuario.getPassword().equals(request.getPassword());
+        boolean esBcrypt = usuario.getPassword() != null && usuario.getPassword().startsWith("$2");
+        boolean coincide = esBcrypt
+                ? passwordEncoder.matches(request.getPassword(), usuario.getPassword())
+                : request.getPassword() != null && request.getPassword().equals(usuario.getPassword());
 
         if (!coincide) {
             throw new IllegalArgumentException("Correo o contraseña incorrectos");
         }
 
+        // Migración transparente: si la contraseña legacy estaba en texto plano, cifrarla con BCrypt
+        if (!esBcrypt) {
+            usuario.setPassword(passwordEncoder.encode(request.getPassword()));
+            usuarioRepository.save(usuario);
+            log.info("Contraseña legacy del usuario ID {} migrada automáticamente a BCrypt", usuario.getId());
+        }
+
         return usuarioMapper.toResponse(usuario);
     }
 
-    @Transactional
     public UsuarioResponse actualizarPasswordPorEmail(CredencialesRequest request) {
-        log.info("Restableciendo contraseña para email: {}", request.getEmail());
-        Usuario usuario = usuarioRepository.findByEmail(request.getEmail().trim().toLowerCase())
-                .orElseThrow(() -> new UsuarioNoEncontradoException("No existe una cuenta registrada con el correo: " + request.getEmail()));
+        String emailNormalizado = normalizarEmail(request.getEmail());
+        log.info("Restableciendo contraseña para email: {}", emailNormalizado);
+        Usuario usuario = usuarioRepository.findByEmail(emailNormalizado)
+                .orElseThrow(() -> new UsuarioNoEncontradoException("No existe una cuenta registrada con el correo: " + emailNormalizado));
 
         usuario.setPassword(passwordEncoder.encode(request.getPassword()));
         Usuario actualizado = usuarioRepository.save(usuario);
         return usuarioMapper.toResponse(actualizado);
     }
 
-    @Transactional(readOnly = true)
     public boolean validarCliente(Long id) {
         try {
             return obtenerPorId(id).getRol() == RolUsuario.CLIENTE;
@@ -175,7 +191,6 @@ public class UsuarioService {
         }
     }
 
-    @Transactional(readOnly = true)
     public boolean validarOperador(Long id) {
         try {
             return obtenerPorId(id).getRol() == RolUsuario.OPERADOR;
@@ -184,7 +199,6 @@ public class UsuarioService {
         }
     }
 
-    @Transactional(readOnly = true)
     public boolean validarAdministrador(Long id) {
         try {
             return obtenerPorId(id).getRol() == RolUsuario.ADMIN;
@@ -193,7 +207,6 @@ public class UsuarioService {
         }
     }
 
-    @Transactional(readOnly = true)
     public boolean validarRepartidor(Long id) {
         try {
             return obtenerPorId(id).getRol() == RolUsuario.REPARTIDOR;
@@ -202,7 +215,6 @@ public class UsuarioService {
         }
     }
 
-    @Transactional(readOnly = true)
     public String obtenerRolPorId(Long id) {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new UsuarioNoEncontradoException("Usuario no encontrado con ID: " + id));

@@ -29,7 +29,6 @@ export function AdminProductosLista() {
 
   useEffect(() => {
     let montado = true
-    setCargando(true)
     Promise.all([ListarProductos(), esperarEsqueleto()])
       .then(([datos]) => {
         if (montado && Array.isArray(datos)) {

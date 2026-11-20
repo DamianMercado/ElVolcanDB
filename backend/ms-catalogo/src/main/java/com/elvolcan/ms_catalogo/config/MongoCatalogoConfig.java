@@ -9,11 +9,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
+import org.springframework.data.convert.WritingConverter;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertCallback;
 import org.springframework.data.mongodb.core.query.Query;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +28,31 @@ import java.util.Map;
 public class MongoCatalogoConfig {
 
     private static final Logger log = LoggerFactory.getLogger(MongoCatalogoConfig.class);
+    private static final ZoneId ZONA_CHILE = ZoneId.of("America/Santiago");
+
+    @WritingConverter
+    public static class LocalDateTimeToDateChileConverter implements Converter<LocalDateTime, Date> {
+        @Override
+        public Date convert(LocalDateTime source) {
+            return Date.from(source.atZone(ZONA_CHILE).toInstant());
+        }
+    }
+
+    @ReadingConverter
+    public static class DateToLocalDateTimeChileConverter implements Converter<Date, LocalDateTime> {
+        @Override
+        public LocalDateTime convert(Date source) {
+            return LocalDateTime.ofInstant(source.toInstant(), ZONA_CHILE);
+        }
+    }
+
+    @Bean
+    public MongoCustomConversions mongoCustomConversions() {
+        return new MongoCustomConversions(List.of(
+                new LocalDateTimeToDateChileConverter(),
+                new DateToLocalDateTimeChileConverter()
+        ));
+    }
 
     @Bean
     public BeforeConvertCallback<ProductoCatalogo> asignarIdSecuencialCatalogo(MongoTemplate mongoTemplate) {

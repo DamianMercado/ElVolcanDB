@@ -1,6 +1,6 @@
 # 🌋 El Volcán — Sistema de Venta y Distribución de Gas Licuado
 
-Plataforma integral de comercio electrónico y logística de distribución de cilindros de gas licuado y accesorios para **El Volcán**. El sistema ha evolucionado de un monolito inicial a una **arquitectura distribuida de microservicios** desacoplada con **Spring Boot 3**, **Spring Cloud**, **MongoDB Atlas**, **Docker Compose** y un **Frontend SPA moderno en React 19**.
+Plataforma integral de comercio electrónico, gestión de inventario y logística de distribución con seguimiento GPS en vivo para **El Volcán**. Construida bajo una **arquitectura distribuida de microservicios** con **Java 17 / Spring Boot 3.4**, **Spring Cloud 2024**, **MongoDB 7.0 / Atlas Cloud**, **Docker Compose** y un **Frontend SPA en React 19**, con zona horaria oficial unificada en **`America/Santiago`**.
 
 ---
 
@@ -8,41 +8,35 @@ Plataforma integral de comercio electrónico y logística de distribución de ci
 
 ```mermaid
 flowchart TB
-    subgraph Frontend_Layer ["Frontend (React 19 + Vite + Tailwind CSS)"]
-        SPA["Cliente Web SPA (Puerto 80 / 5173)<br/>• Catálogo & Carrito<br/>• Seguimiento GPS Leaflet<br/>• Portal Repartidor & Admin"]
+    subgraph Frontend_Layer ["Frontend (React 19 + Vite 8 + Tailwind CSS 4)"]
+        SPA["Cliente Web SPA (Render Static Site / Nginx)<br/>• Catálogo & Carrito<br/>• Seguimiento GPS en Vivo (Leaflet + CartoDB)<br/>• Consola Repartidor & Panel Admin"]
     end
 
-    subgraph Gateway_Discovery ["Enrutamiento y Descubrimiento"]
+    subgraph Gateway_Discovery ["Enrutamiento y Descubrimiento (AWS EC2)"]
         GW["Spring Cloud Gateway MVC<br/>:8080"]
         EUR["Eureka Service Registry<br/>:8761"]
     end
 
     subgraph Microservices ["Microservicios Backend (Spring Boot 3.4)"]
-        AUTH["ms-auth :8082<br/>Autenticación & JWT"]
-        USU["ms-usuario :8081<br/>Gestión de Usuarios & Roles"]
+        AUTH["ms-auth :8082<br/>Sesiones & JWT"]
+        USU["ms-usuario :8081<br/>Usuarios, BCrypt & Roles"]
         INV["ms-inventario :8083<br/>Stock & Movimientos"]
         CAT["ms-catalogo :8084<br/>Catálogo de Productos"]
-        VEN["ms-venta :8085<br/>Pedidos & Ventas"]
+        VEN["ms-venta :8085<br/>Pedidos, Auditoría & Seguimiento GPS"]
         PAG["ms-pago :8086<br/>Pasarela Webpay & Reembolsos"]
     end
 
-    subgraph Data_Layer ["Capa de Persistencia"]
-        MONGO[("MongoDB 7.0 / Atlas Cloud<br/>Base de Datos: el_volcan_db")]
+    subgraph Data_Layer ["Capa de Persistencia NoSQL"]
+        MONGO[("MongoDB 7.0 / Atlas Cloud<br/>el_volcan_db · TZ America/Santiago")]
     end
 
     SPA -->|REST / HTTP| GW
     GW <-->|Registro / Heartbeat| EUR
-    GW --> AUTH
-    GW --> USU
-    GW --> INV
-    GW --> CAT
-    GW --> VEN
-    GW --> PAG
+    GW --> AUTH & USU & INV & CAT & VEN & PAG
 
     AUTH -. OpenFeign .-> USU
     CAT -. OpenFeign .-> INV
-    VEN -. OpenFeign .-> INV
-    VEN -. OpenFeign .-> CAT
+    VEN -. OpenFeign .-> INV & CAT
     PAG -. OpenFeign .-> VEN
 
     AUTH & USU & INV & CAT & VEN & PAG --> MONGO
@@ -53,42 +47,21 @@ flowchart TB
 ## 🛠️ Tecnologías Utilizadas
 
 ### 🔹 Backend & Microservicios
-- **Java 17 & Spring Boot 3.4.0**: Framework base para microservicios de alto rendimiento.
-- **Spring Cloud 2024.0.0**:
-  - **Netflix Eureka Server (`eureka-server`)**: Registro y descubrimiento dinámico de servicios en puerto `8761`.
-  - **Spring Cloud Gateway MVC (`gateway-service`)**: Puerta de enlace única en puerto `8080` que enruta el tráfico `/api/v1/**` y centraliza CORS.
-  - **OpenFeign**: Comunicación síncrona declarativa entre microservicios (validación de stock, transacciones de venta y confirmación de pagos).
-  - **Spring Cloud LoadBalancer**: Balanceo de carga en llamadas entre servicios.
-- **Seguridad & Tokens**:
-  - **JSON Web Tokens (JJWT 0.12.6)**: Autenticación 'stateless' basada en tokens y claims.
-  - **Spring Security Crypto**: Cifrado seguro de contraseñas (`BCryptPasswordEncoder`).
-- **Persistencia**:
-  - **Spring Data MongoDB**: Modelado NoSQL, colecciones de usuarios, sesiones, productos, inventario, ventas y pagos.
-- **Documentación & Herramientas**:
-  - **Springdoc OpenAPI 2.8.0 (Swagger UI)**: Documentación viva de endpoints por microservicio.
-  - **MapStruct 1.5.5**: Mapeo DTO ↔ Entidad en tiempo de compilación.
-  - **Lombok**: Reducción de código boilerplate.
-
-### 🔹 Base de Datos NoSQL
-- **MongoDB 7.0 / MongoDB Atlas Cloud**:
-  - Soporte para datos geoespaciales (`GeoJSON` y coordenadas 2dsphere para clientes y repartidores).
-  - Esquemas JSON Schema con validaciones estrictas y transacciones ACID multi-documento.
-  - Script de inicialización y carga de semillas (`cargar_atlas.js`).
+- **Java 17 & Spring Boot 3.4.0** con **Spring Boot Actuator** (`/actuator/health`) en los 8 servicios.
+- **Spring Cloud 2024.0.0**: **Netflix Eureka Server**, **Spring Cloud Gateway MVC**, **OpenFeign** y **Spring Cloud LoadBalancer**.
+- **Seguridad**: **JJWT 0.12.6** (tokens firmados con claims de perfil completos y revocación en logout/cambio de clave) y **BCrypt** (`Spring Security Crypto`).
+- **Persistencia**: **Spring Data MongoDB** con conversores explícitos para **`America/Santiago`** e índices geoespaciales `2dsphere`.
+- **Herramientas**: **MapStruct 1.5.5**, **Lombok 1.18.34**, **Springdoc OpenAPI 2.8.0 (Swagger UI)** y **Maven Wrapper (`mvnw`)**.
 
 ### 🔹 Frontend Moderno (SPA)
-- **React 19 (`react` 19.2.8 + `react-dom` 19.2.8)**: Interfaz de usuario declarativa basada en componentes y hooks.
-- **Vite 8**: Servidor de desarrollo ultrarrápido y empaquetador de producción.
-- **React Router DOM 7**: Enrutamiento declarativo para vistas de cliente, checkout, seguimiento, repartidor y administrador.
-- **Tailwind CSS 4**: Diseño responsivo y moderno mediante utilidades utilitarias.
-- **Leaflet & OpenStreetMap**: Mapas interactivos para visualización y trazado de rutas de reparto en tiempo real con fallback resiliente.
-- **Context API**: Manejo de estado global para carrito de compras (`CarritoContext`) y autenticación de sesión (`SesionContext`).
-- **Testing**:
-  - **Vitest 5.0**: Motor de pruebas unitarias y de integración de alto rendimiento.
-  - **Testing Library (`@testing-library/react` & `@testing-library/jest-dom`)**: Pruebas de integración del DOM y flujos de usuario (25 tests automatizados).
+- **React 19 (`19.2.8`)**, **Vite 8 (`8.3.0`)**, **React Router DOM 7 (`7.18.4`)** y **Tailwind CSS 4 (`4.1.14`)**.
+- **Leaflet (`1.9.4`) + CartoDB + OSRM**: Mapas interactivos y seguimiento sincronizado en vivo con `ms-venta`.
+- **Calidad y Testing**: **Vitest 5.0**, **Testing Library** y **ESLint 10** (0 errores).
 
-### 🔹 DevOps, Contenedores & Despliegue
-- **Docker & Docker Compose**: Orquestación multi-contenedor que levanta MongoDB, Eureka, Gateway y los 6 microservicios con un solo comando.
-- **Multi-Stage Builds & Nginx**: Imagen optimizada de frontend servida mediante Nginx con proxy inverso hacia el API Gateway.
+### 🔹 DevOps, AWS EC2 & Render
+- **Docker & Docker Compose** con contenedores Alpine configurados con `tzdata` y `TZ=America/Santiago`.
+- **Automatización en AWS EC2**: Scripts `backend/scripts/ec2-userdata-setup.sh` y `backend/scripts/ec2-autodeploy.sh` con servicio `systemd` para arranque automático al iniciar la instancia y tarea `cron` diaria a las **03:00 AM hora de Santiago de Chile** que detecta cambios en GitHub y actualiza contenedores automáticamente.
+- **Render Static Site** + **Nginx Multi-Stage Build** para el frontend.
 
 ---
 
@@ -97,75 +70,50 @@ flowchart TB
 ```text
 ElVolcanDB/
 ├── backend/
-│   ├── eureka-server/           # Registro de servicios Eureka (puerto 8761)
-│   ├── gateway-service/         # Spring Cloud Gateway MVC (puerto 8080)
-│   ├── ms-auth/                 # Microservicio de autenticación y tokens JWT (8082)
-│   ├── ms-usuario/              # Microservicio de usuarios y roles (8081)
-│   ├── ms-catalogo/             # Catálogo de cilindros y accesorios (8084)
-│   ├── ms-inventario/           # Gestión de stock y movimientos (8083)
-│   ├── ms-venta/                # Gestión de pedidos y despachos (8085)
-│   ├── ms-pago/                 # Procesamiento y reembolso de pagos Webpay (8086)
-│   ├── mongodb/                 # Datos semilla JSON y script de carga Atlas
-│   ├── docker-compose.yml       # Orquestador local completo
+│   ├── eureka-server/           # Registro de servicios Eureka (:8761)
+│   ├── gateway-service/         # Spring Cloud Gateway MVC (:8080)
+│   ├── ms-auth/                 # Autenticación, sesiones y JWT (:8082)
+│   ├── ms-usuario/              # Usuarios, roles y BCrypt (:8081)
+│   ├── ms-catalogo/             # Catálogo de cilindros y accesorios (:8084)
+│   ├── ms-inventario/           # Stock y movimientos de bodega (:8083)
+│   ├── ms-venta/                # Pedidos, seguimiento GPS en vivo y auditoría (:8085)
+│   ├── ms-pago/                 # Pagos Webpay y reembolsos (:8086)
+│   ├── mongodb/                 # Datos semilla JSON y script Atlas
+│   ├── scripts/                 # Auto-arranque EC2 (systemd) y auto-update 03:00 AM Chile (cron)
+│   ├── docker-compose.yml       # Orquestador Docker completo (TZ America/Santiago)
 │   └── .env.example             # Plantilla de variables de entorno backend
 ├── frontend/
-│   ├── src/
-│   │   ├── components/          # Componentes modulares (admin, mapa, pedido, etc.)
-│   │   ├── context/             # Estados globales (Carrito, Sesión)
-│   │   ├── pages/               # Páginas principales (Inicio, Productos, Checkout...)
-│   │   ├── service/             # Conexión con endpoints REST del API Gateway
-│   │   └── __tests__/           # Suite de pruebas automatizadas con Vitest
-│   ├── Dockerfile               # Construcción multi-stage Nginx
-│   ├── nginx.conf               # Configuración Nginx y reverse-proxy
-│   ├── package.json             # Dependencias React 19, Tailwind 4, Leaflet
-│   └── vite.config.js           # Configuración Vite
+│   ├── src/                     # SPA React 19 (components, context, pages, service, __tests__)
+│   ├── Dockerfile               # Build multi-stage Nginx
+│   ├── nginx.conf               # Reverse proxy y soporte SPA
+│   └── .env.example             # Plantilla VITE_API_URL y VITE_CARTO_API_KEY
+├── .gitattributes               # Normalización de saltos de línea LF para scripts Linux/EC2
 ├── .gitignore                   # Protección de credenciales y exclusiones
 └── README.md                    # Documentación general del proyecto
 ```
 
 ---
 
-## 🚀 Puesta en Marcha
+## 🚀 Puesta en Marcha Rápida
 
-### 1. Requisitos Previos
-- **Docker Desktop** (para ejecución contenerizada) o **Java 17 JDK** + **Node.js 20+** (para desarrollo local).
-- Cluster de **MongoDB Atlas** o MongoDB local en puerto `27017`.
-
-### 2. Ejecutar con Docker Compose (Recomendado)
+### Backend (Local o AWS EC2)
 ```bash
-# 1. Posicionarse en backend
 cd backend
-
-# 2. Configurar variables de entorno (opcional si usas MongoDB Atlas)
 cp .env.example .env
-
-# 3. Levantar todos los servicios
 docker compose up --build -d
 ```
 
-### 3. Ejecutar Frontend en Desarrollo
+### Auto-arranque y Auto-actualización en AWS EC2 (03:00 AM Chile)
+```bash
+# En una instancia Ubuntu EC2 (o pegar en User Data al crearla):
+sudo bash backend/scripts/ec2-userdata-setup.sh
+```
+
+### Frontend (Desarrollo y Pruebas)
 ```bash
 cd frontend
 npm install
+npm run lint
+npm test
 npm run dev
 ```
-La aplicación estará disponible en `http://localhost:5173`.
-
-### 4. Ejecutar Pruebas Automatizadas
-```bash
-cd frontend
-npm test
-```
-
----
-
-## 📌 URLs y Dashboards de Consulta
-- **Eureka Server Dashboard**: [http://localhost:8761](http://localhost:8761)
-- **API Gateway**: [http://localhost:8080](http://localhost:8080)
-- **Documentación Swagger / OpenAPI**:
-  - `ms-usuario`: `http://localhost:8081/doc/swagger-ui.html`
-  - `ms-auth`: `http://localhost:8082/doc/swagger-ui.html`
-  - `ms-inventario`: `http://localhost:8083/doc/swagger-ui.html`
-  - `ms-catalogo`: `http://localhost:8084/doc/swagger-ui.html`
-  - `ms-venta`: `http://localhost:8085/doc/swagger-ui.html`
-  - `ms-pago`: `http://localhost:8086/doc/swagger-ui.html`

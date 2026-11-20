@@ -10,7 +10,6 @@ import { Variables } from '../../config/variables'
 const CARTO_API_KEY = Variables.cartoApiKey
 
 const obtenerUrlTilesCliente = () => {
-  // Paleta Uber CartoDB Positron: minimalista (#ffffff / #e7e8ec / #adadad)
   const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
   return `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png${queryParam}`
 }
@@ -67,28 +66,27 @@ export function MapaSeguimientoCliente({ entrega }) {
   const contenedorRef = useRef(null)
   const mapaRef = useRef(null)
   const marcadorCamionRef = useRef(null)
+  const marcadorDestinoRef = useRef(null)
   const lineaRutaRef = useRef(null)
   const [rutaPuntos, setRutaPuntos] = useState([])
 
-  const posRepartidor = entrega?.posicionActual || {
-    lat: COORDENADAS_PLANTA_ORIGEN.lat,
-    lng: COORDENADAS_PLANTA_ORIGEN.lng,
-    rumbo: 180,
-    indicePunto: 0,
-  }
+  const origenLat = entrega?.origen?.lat ?? COORDENADAS_PLANTA_ORIGEN.lat
+  const origenLng = entrega?.origen?.lng ?? COORDENADAS_PLANTA_ORIGEN.lng
+  const destinoLat =
+    entrega?.cliente?.coordenadas?.lat ?? COORDENADAS_CLIENTE_DESTINO.lat
+  const destinoLng =
+    entrega?.cliente?.coordenadas?.lng ?? COORDENADAS_CLIENTE_DESTINO.lng
 
-  // 1. Inicializar Mapa
+  // 1. Inicializar Mapa una sola vez
   useEffect(() => {
     if (!contenedorRef.current || mapaRef.current) return
 
-    const centro = [posRepartidor.lat, posRepartidor.lng]
     const mapa = L.map(contenedorRef.current, {
-      center: centro,
+      center: [COORDENADAS_PLANTA_ORIGEN.lat, COORDENADAS_PLANTA_ORIGEN.lng],
       zoom: 14,
       zoomControl: false,
     })
 
-    // Tile Layer: CartoDB Positron / OpenStreetMap
     L.tileLayer(obtenerUrlTilesCliente(), {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -98,7 +96,6 @@ export function MapaSeguimientoCliente({ entrega }) {
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
 
-    // Marcador Planta / Origen
     L.marker([COORDENADAS_PLANTA_ORIGEN.lat, COORDENADAS_PLANTA_ORIGEN.lng], {
       icon: crearIconoPlantaCliente(),
     })
@@ -110,34 +107,18 @@ export function MapaSeguimientoCliente({ entrega }) {
       )
       .addTo(mapa)
 
-    // Marcador Destino / Casa del Cliente
-    L.marker([COORDENADAS_CLIENTE_DESTINO.lat, COORDENADAS_CLIENTE_DESTINO.lng], {
-      icon: crearIconoCasaCliente(),
-    })
-      .bindPopup(
-        `<div class="p-1 text-xs">
-          <strong class="text-[#FF4500] font-bold">Tu Domicilio</strong>
-          <p class="text-slate-700">${entrega?.cliente?.direccion || 'Av. Concha y Toro 1340'}</p>
-        </div>`
-      )
-      .addTo(mapa)
+    const marcadorDestino = L.marker(
+      [COORDENADAS_CLIENTE_DESTINO.lat, COORDENADAS_CLIENTE_DESTINO.lng],
+      { icon: crearIconoCasaCliente() }
+    ).addTo(mapa)
+    marcadorDestinoRef.current = marcadorDestino
 
-    // Marcador Repartidor
-    const marcadorCamion = L.marker([posRepartidor.lat, posRepartidor.lng], {
-      icon: crearIconoCamionCliente(posRepartidor.rumbo || 180),
-      zIndexOffset: 1000,
-    })
-      .bindPopup(
-        `<div class="p-1 text-xs">
-          <strong class="text-blue-700 font-bold">Repartidor en Camino</strong>
-          <p class="text-slate-700 font-medium">${entrega?.repartidor?.nombre || 'Carlos Silva'}</p>
-          <p class="text-slate-500 text-[11px]">${entrega?.repartidor?.vehiculo || 'Furgón Gas'} (${entrega?.repartidor?.patente || 'BV-9281'})</p>
-        </div>`
-      )
-      .addTo(mapa)
+    const marcadorCamion = L.marker(
+      [COORDENADAS_PLANTA_ORIGEN.lat, COORDENADAS_PLANTA_ORIGEN.lng],
+      { icon: crearIconoCamionCliente(180), zIndexOffset: 1000 }
+    ).addTo(mapa)
     marcadorCamionRef.current = marcadorCamion
 
-    // Polilínea de la ruta (Azul Uber #2171ec)
     const lineaRuta = L.polyline([], {
       color: '#2171ec',
       weight: 6,
@@ -155,13 +136,13 @@ export function MapaSeguimientoCliente({ entrega }) {
     }
   }, [])
 
-  // 2. Cargar trazado OSRM
+  // 2. Cargar trazado OSRM según origen y destino del pedido actual
   useEffect(() => {
     let cancelado = false
     const cargar = async () => {
       const res = await obtenerRutaOSRM(
-        COORDENADAS_PLANTA_ORIGEN,
-        COORDENADAS_CLIENTE_DESTINO
+        { lat: origenLat, lng: origenLng },
+        { lat: destinoLat, lng: destinoLng }
       )
       if (cancelado) return
       setRutaPuntos(res.puntos)
@@ -181,34 +162,52 @@ export function MapaSeguimientoCliente({ entrega }) {
     return () => {
       cancelado = true
     }
-  }, [])
+  }, [origenLat, origenLng, destinoLat, destinoLng])
 
-  // 3. Sincronizar posición del camión cuando cambie `entrega`
+  // 3. Sincronizar posición del camión y destino cuando cambie `entrega`
   useEffect(() => {
+    if (marcadorDestinoRef.current) {
+      marcadorDestinoRef.current.setLatLng([destinoLat, destinoLng])
+      marcadorDestinoRef.current.bindPopup(
+        `<div class="p-1 text-xs">
+          <strong class="text-[#FF4500] font-bold">Tu Domicilio</strong>
+          <p class="text-slate-700">${entrega?.cliente?.direccion || 'Av. Concha y Toro 1340'}</p>
+        </div>`
+      )
+    }
+
     if (!marcadorCamionRef.current) return
-    const lat = entrega?.posicionActual?.lat ?? COORDENADAS_PLANTA_ORIGEN.lat
-    const lng = entrega?.posicionActual?.lng ?? COORDENADAS_PLANTA_ORIGEN.lng
+    const lat = entrega?.posicionActual?.lat ?? origenLat
+    const lng = entrega?.posicionActual?.lng ?? origenLng
     const rumbo = entrega?.posicionActual?.rumbo ?? 180
 
     marcadorCamionRef.current.setLatLng([lat, lng])
     marcadorCamionRef.current.setIcon(crearIconoCamionCliente(rumbo))
+    marcadorCamionRef.current.bindPopup(
+      `<div class="p-1 text-xs">
+        <strong class="text-blue-700 font-bold">Repartidor</strong>
+        <p class="text-slate-700 font-medium">${entrega?.repartidor?.nombre || 'Por asignar'}</p>
+        <p class="text-slate-500 text-[11px]">${entrega?.repartidor?.vehiculo || 'Furgón Gas'} (${entrega?.repartidor?.patente || 'KJ-WP-42'})</p>
+      </div>`
+    )
 
-    // Actualizar ruta restante
     if (rutaPuntos.length > 0 && lineaRutaRef.current) {
-      const idx = entrega?.posicionActual?.indicePunto ?? 0
+      const idx = Math.min(
+        entrega?.posicionActual?.indicePunto ?? 0,
+        rutaPuntos.length - 1
+      )
       const restante = rutaPuntos.slice(idx)
       lineaRutaRef.current.setLatLngs(restante.length ? restante : [[lat, lng]])
     }
-  }, [entrega, rutaPuntos])
+  }, [entrega, rutaPuntos, origenLat, origenLng, destinoLat, destinoLng])
 
-  // Botón para enfocar pedido
   const reenfocar = () => {
-    if (mapaRef.current && rutaPuntos.length > 0) {
-      const lat = entrega?.posicionActual?.lat ?? COORDENADAS_PLANTA_ORIGEN.lat
-      const lng = entrega?.posicionActual?.lng ?? COORDENADAS_PLANTA_ORIGEN.lng
+    if (mapaRef.current) {
+      const lat = entrega?.posicionActual?.lat ?? origenLat
+      const lng = entrega?.posicionActual?.lng ?? origenLng
       const bounds = L.latLngBounds([
         [lat, lng],
-        [COORDENADAS_CLIENTE_DESTINO.lat, COORDENADAS_CLIENTE_DESTINO.lng],
+        [destinoLat, destinoLng],
       ])
       mapaRef.current.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 })
     }
@@ -218,7 +217,6 @@ export function MapaSeguimientoCliente({ entrega }) {
     <div className="relative h-full w-full overflow-hidden rounded-2xl border border-[#e7e8ec] shadow-md mapa-estilo-uber">
       <div ref={contenedorRef} className="h-full min-h-[420px] w-full" />
 
-      {/* Botón flotante de recentrado */}
       <button
         type="button"
         onClick={reenfocar}
@@ -243,22 +241,36 @@ export function MapaSeguimientoCliente({ entrega }) {
               <p className="text-xs font-bold text-[#121212]">
                 {entrega?.estado === 'entregado'
                   ? '¡Pedido Entregado con Éxito!'
+                  : entrega?.estado === 'cancelado'
+                  ? 'Pedido Cancelado'
                   : entrega?.estado === 'llegando'
                   ? '¡El repartidor ha llegado a tu puerta!'
+                  : entrega?.estado === 'pendiente'
+                  ? 'Esperando asignación de repartidor en planta'
                   : 'Repartidor en camino a tu domicilio'}
               </p>
               <p className="text-[11px] text-[#adadad]">
-                {entrega?.repartidor?.nombre} en camino por {entrega?.cliente?.direccion}
+                {entrega?.repartidor?.nombre} • {entrega?.cliente?.direccion}
               </p>
             </div>
           </div>
 
           <div className="text-right">
             <span className="text-sm font-black text-[#2171ec]">
-              {entrega?.estado === 'entregado' ? 'Entregado' : `~${entrega?.etaMinutos || 8} min`}
+              {entrega?.estado === 'entregado'
+                ? 'Entregado'
+                : entrega?.estado === 'cancelado'
+                ? 'Cancelado'
+                : entrega?.estado === 'pendiente'
+                ? 'En planta'
+                : `~${entrega?.etaMinutos ?? 8} min`}
             </span>
             <p className="text-[10px] text-[#adadad]">
-              {entrega?.estado === 'entregado' ? 'Completado' : `${entrega?.distanciaKm || 2.1} km`}
+              {entrega?.estado === 'entregado'
+                ? 'Completado'
+                : entrega?.estado === 'cancelado'
+                ? 'Anulado'
+                : `${entrega?.distanciaKm ?? 2.1} km`}
             </p>
           </div>
         </div>

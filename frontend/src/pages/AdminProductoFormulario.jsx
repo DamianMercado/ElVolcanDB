@@ -47,24 +47,19 @@ export function AdminProductoFormulario() {
     if (!esEdicion) {
       reiniciar(VALORES_INICIALES_PRODUCTO)
       if (DURACION_ESQUELETO_MS > 0) {
-        setCargando(true)
         esperarEsqueleto().then(() => {
           if (montado) setCargando(false)
         })
-      } else {
-        setCargando(false)
       }
       return () => {
         montado = false
       }
     }
 
-    setCargando(true)
-    setError(null)
-
     Promise.all([ObtenerProducto(id), esperarEsqueleto()])
       .then(([producto]) => {
         if (montado && producto) {
+          setError(null)
           reiniciar(aValoresFormularioProducto(producto))
         }
       })

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCarrito } from '../context/Carrito.jsx'
-import { obtenerSesion } from '../utils/token.js'
+import { useSesion } from '../context/Sesion.jsx'
 import { crearNuevoPedido } from '../service/pedidoService.js'
 import { formatearPesos } from '../utils/formato.js'
 import { BannerAlerta } from '../components/ui/BannerAlerta.jsx'
@@ -27,7 +27,7 @@ export function CreacionPedido() {
     total,
   } = useCarrito()
 
-  const usuario = obtenerSesion()
+  const { usuario } = useSesion()
 
   // Estados de datos del cliente
   const [nombreCliente, setNombreCliente] = useState(

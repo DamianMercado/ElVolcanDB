@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export const Miniatura = ({
   src,
@@ -6,11 +6,8 @@ export const Miniatura = ({
   alt = '',
   className = 'h-12 w-12',
 }) => {
-  const [falla, setFalla] = useState(false)
-
-  useEffect(() => {
-    setFalla(false)
-  }, [src])
+  const [srcFallida, setSrcFallida] = useState(null)
+  const falla = Boolean(src) && srcFallida === src
 
   const clases = `shrink-0 rounded-md bg-white border border-stone-200 object-contain p-1 ${className}`
 
@@ -31,7 +28,7 @@ export const Miniatura = ({
       alt={alt || nombre}
       title={nombre || src}
       className={clases}
-      onError={() => setFalla(true)}
+      onError={() => setSrcFallida(src)}
     />
   )
 }

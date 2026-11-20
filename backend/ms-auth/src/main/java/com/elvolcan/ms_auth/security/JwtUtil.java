@@ -1,5 +1,6 @@
 package com.elvolcan.ms_auth.security;
 
+import com.elvolcan.ms_auth.dto.response.UsuarioExternoResponse;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -25,19 +26,54 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
+    public long getExpirationMs() {
+        return expirationMs > 0 ? expirationMs : 86400000L;
+    }
+
     public String generarToken(Long idUsuario, String nombreUsuario, String email, String rol) {
+        return generarTokenConPerfil(idUsuario, nombreUsuario, null, null, email, rol, null, null, null, null);
+    }
+
+    public String generarToken(UsuarioExternoResponse usuario) {
+        String nombre = usuario.getNombre() != null ? usuario.getNombre().trim() : "";
+        String apellido = usuario.getApellido() != null ? usuario.getApellido().trim() : "";
+        String nombreCompleto = (nombre + " " + apellido).trim();
+        return generarTokenConPerfil(
+                usuario.getId(),
+                nombreCompleto,
+                nombre,
+                apellido,
+                usuario.getEmail(),
+                usuario.getRol(),
+                usuario.getRut(),
+                usuario.getTelefono(),
+                usuario.getDireccion(),
+                usuario.getComuna()
+        );
+    }
+
+    private String generarTokenConPerfil(
+            Long idUsuario, String nombreUsuario, String nombres, String apellidos,
+            String email, String rol, String rut, String telefono, String direccion, String comuna
+    ) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("idUsuario", idUsuario);
         claims.put("nombreUsuario", nombreUsuario);
         claims.put("email", email);
         claims.put("rol", rol);
-        // Alias compatibles con la estructura de proyecto-crud (UsuarioDesdeToken)
+        // Alias compatibles con UsuarioDesdeToken en frontend
         claims.put("nombre", nombreUsuario);
         claims.put("perfil", rol);
         claims.put("correo", email);
+        if (nombres != null && !nombres.isBlank()) claims.put("nombres", nombres);
+        if (apellidos != null && !apellidos.isBlank()) claims.put("apellidos", apellidos);
+        if (rut != null && !rut.isBlank()) claims.put("rut", rut);
+        if (telefono != null && !telefono.isBlank()) claims.put("telefono", telefono);
+        if (direccion != null && !direccion.isBlank()) claims.put("direccion", direccion);
+        if (comuna != null && !comuna.isBlank()) claims.put("comuna", comuna);
 
         Date ahora = new Date();
-        Date expiracion = new Date(ahora.getTime() + expirationMs);
+        Date expiracion = new Date(ahora.getTime() + getExpirationMs());
 
         return Jwts.builder()
                 .claims(claims)

@@ -1,5 +1,6 @@
 package com.elvolcan.ms_venta.controller;
 
+import com.elvolcan.ms_venta.dto.request.SeguimientoVentaRequest;
 import com.elvolcan.ms_venta.dto.request.VentaPagoRequest;
 import com.elvolcan.ms_venta.dto.request.VentaRequest;
 import com.elvolcan.ms_venta.dto.response.VentaCompletaResponse;
@@ -19,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/ventas")
 @RequiredArgsConstructor
-@Tag(name = "Ventas", description = "Generación y gestión de ventas de clientes de El Volcán")
+@Tag(name = "Ventas", description = "Generación, seguimiento en vivo y gestión de pedidos de clientes de El Volcán")
 public class VentaController {
 
     private final VentaService ventaService;
@@ -41,6 +42,15 @@ public class VentaController {
         return ResponseEntity.ok(ventaService.obtenerPorId(id));
     }
 
+    @GetMapping("/codigo/{codigoVenta}")
+    @Operation(summary = "Obtener venta y estado de seguimiento por código de pedido (ej: EV-101)")
+    public ResponseEntity<VentaResponse> obtenerPorCodigo(
+            @PathVariable String codigoVenta,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        ventaService.autenticarConMsAuth(authHeader);
+        return ResponseEntity.ok(ventaService.obtenerPorCodigo(codigoVenta));
+    }
+
     @GetMapping("/{id}/completa")
     @Operation(summary = "Obtener venta completa enriquecida con datos de ms-usuario y ms-pago")
     public ResponseEntity<VentaCompletaResponse> obtenerVentaCompleta(
@@ -57,6 +67,15 @@ public class VentaController {
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
         ventaService.autenticarConMsAuth(authHeader);
         return ResponseEntity.ok(ventaService.obtenerPorUsuario(idUsuario));
+    }
+
+    @GetMapping("/repartidor/{repartidor}")
+    @Operation(summary = "Obtener ventas asignadas a un repartidor por nombre")
+    public ResponseEntity<List<VentaResponse>> obtenerPorRepartidor(
+            @PathVariable String repartidor,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        ventaService.autenticarConMsAuth(authHeader);
+        return ResponseEntity.ok(ventaService.obtenerPorRepartidor(repartidor));
     }
 
     @GetMapping("/estado/{estado}")
@@ -96,6 +115,16 @@ public class VentaController {
             @RequestHeader(value = "Authorization", required = false) String authHeader) {
         ventaService.autenticarConMsAuth(authHeader);
         return ResponseEntity.ok(ventaService.asignarRepartidor(id, repartidor));
+    }
+
+    @PutMapping("/{id}/seguimiento")
+    @Operation(summary = "Actualizar telemetría GPS y estado de despacho en vivo de una venta")
+    public ResponseEntity<VentaResponse> actualizarSeguimiento(
+            @PathVariable Long id,
+            @RequestBody SeguimientoVentaRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        ventaService.autenticarConMsAuth(authHeader);
+        return ResponseEntity.ok(ventaService.actualizarSeguimiento(id, request));
     }
 
     @PutMapping("/{id}/entregar")
