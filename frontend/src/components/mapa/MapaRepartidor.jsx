@@ -8,13 +8,13 @@ import {
   actualizarPosicionRepartidor,
   cambiarEstadoEntrega,
 } from '../../service/repartoService'
+import { Variables } from '../../config/variables'
 
 // Generador de iconos HTML personalizados para Leaflet
-const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || ''
+const CARTO_API_KEY = Variables.cartoApiKey
 
 const obtenerUrlTiles = (modoOscuro = false) => {
   // Paleta Uber CartoDB: Positron día (#ffffff / #e7e8ec / #adadad) y Dark Matter noche (#121212)
-  // Libre y pública por defecto; si se define VITE_CARTO_API_KEY se incluye el parámetro key
   const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
   return modoOscuro
     ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png${queryParam}`
@@ -116,7 +116,7 @@ export function MapaRepartidor({
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
-      subdomains: 'abc',
+      subdomains: 'abcd',
     }).addTo(mapa)
     capaTilesRef.current = capaTiles
 

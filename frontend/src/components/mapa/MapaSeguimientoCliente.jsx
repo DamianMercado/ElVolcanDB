@@ -5,11 +5,12 @@ import {
   COORDENADAS_CLIENTE_DESTINO,
   obtenerRutaOSRM,
 } from '../../service/repartoService'
+import { Variables } from '../../config/variables'
 
-const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || ''
+const CARTO_API_KEY = Variables.cartoApiKey
 
 const obtenerUrlTilesCliente = () => {
-  // Paleta Uber CartoDB Positron: minimalista (#ffffff / #e7e8ec / #adadad) libre y pública por defecto
+  // Paleta Uber CartoDB Positron: minimalista (#ffffff / #e7e8ec / #adadad)
   const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
   return `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png${queryParam}`
 }
@@ -92,7 +93,7 @@ export function MapaSeguimientoCliente({ entrega }) {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
-      subdomains: 'abc',
+      subdomains: 'abcd',
     }).addTo(mapa)
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
