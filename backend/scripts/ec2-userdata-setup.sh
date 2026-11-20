@@ -80,6 +80,7 @@ if [[ ! -d "${REPO_DIR}/.git" ]]; then
   fi
 fi
 
+git config --system --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 git config --global --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
 chmod +x "${REPO_DIR}/backend/scripts/ec2-autodeploy.sh"
 chmod +x "${REPO_DIR}/backend/scripts/ec2-sync-ip.sh"
@@ -119,6 +120,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+Environment=HOME=/root
 Environment=TZ=America/Santiago
 Environment=ELVOLCAN_REPO_DIR=${REPO_DIR}
 Environment=ELVOLCAN_BRANCH=${BRANCH}
@@ -139,6 +141,7 @@ echo "    Servicio systemd elvolcan-docker.service habilitado."
 echo ">>> [6/7] Configurando tarea programada Cron (todos los días a las 03:00 AM America/Santiago)..."
 cat > /etc/cron.d/elvolcan-autodeploy <<EOF
 SHELL=/bin/bash
+HOME=/root
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 CRON_TZ=America/Santiago
 TZ=America/Santiago

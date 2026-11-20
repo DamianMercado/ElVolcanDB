@@ -12,7 +12,9 @@
 set -euo pipefail
 
 export TZ="America/Santiago"
+export HOME="${HOME:-/root}"
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
 
 MODO="${1:---cron}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -84,22 +86,26 @@ if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
   log "ADVERTENCIA: No existe ${BACKEND_DIR}/.env. Se usarán valores por defecto (MongoDB local). Crea ${BACKEND_DIR}/.env con tu MONGO_URI de Atlas."
 fi
 
-# Permitir operaciones git aunque el servicio corra como root sobre un repo de ubuntu
+# Permitir operaciones git aunque el servicio corra como root (systemd/cron) sobre un repo de ubuntu
 git config --global --add safe.directory "${REPO_DIR}" >/dev/null 2>&1 || true
+
+git_repo() {
+  git -c "safe.directory=${REPO_DIR}" -C "${REPO_DIR}" "$@"
+}
 
 cd "${REPO_DIR}"
 
-LOCAL_SHA="$(git rev-parse HEAD)"
+LOCAL_SHA="$(git_repo rev-parse HEAD)"
 HAY_CAMBIOS=false
 
 # 3. Consultar cambios en GitHub
 log "Consultando cambios remotos en origin/${BRANCH} (commit local: ${LOCAL_SHA:0:7})..."
-if git fetch origin "${BRANCH}" --quiet; then
-  REMOTE_SHA="$(git rev-parse "origin/${BRANCH}")"
+if git_repo fetch origin "${BRANCH}" --quiet; then
+  REMOTE_SHA="$(git_repo rev-parse "origin/${BRANCH}")"
   if [[ "${LOCAL_SHA}" != "${REMOTE_SHA}" ]]; then
     HAY_CAMBIOS=true
     log "Cambios detectados en GitHub: ${LOCAL_SHA:0:7} -> ${REMOTE_SHA:0:7}"
-    git log --oneline "${LOCAL_SHA}..${REMOTE_SHA}" | while IFS= read -r linea; do
+    git_repo log --oneline "${LOCAL_SHA}..${REMOTE_SHA}" | while IFS= read -r linea; do
       log "  + ${linea}"
     done
   else
@@ -115,11 +121,11 @@ cd "${BACKEND_DIR}"
 if [[ "${HAY_CAMBIOS}" == "true" || "${MODO}" == "--force" ]]; then
   if [[ "${HAY_CAMBIOS}" == "true" ]]; then
     log "Actualizando clon local a origin/${BRANCH} (manteniendo backend/.env intacto)..."
-    git -C "${REPO_DIR}" reset --hard "origin/${BRANCH}" >>"${LOG_FILE}" 2>&1
+    git_repo reset --hard "origin/${BRANCH}" >>"${LOG_FILE}" 2>&1
     chmod +x "${REPO_DIR}"/backend/scripts/*.sh 2>/dev/null || true
   fi
 
-  log "Reconstruyendo y actualizando contenedores Docker..."
+  log "Reconstruyendo y actualizando contenedores Docker (sigue el progreso en vivo con: tail -f ${LOG_FILE})..."
   docker compose up --build -d --remove-orphans >>"${LOG_FILE}" 2>&1
 
   log "Limpiando imágenes Docker huérfanas para preservar espacio en disco..."
