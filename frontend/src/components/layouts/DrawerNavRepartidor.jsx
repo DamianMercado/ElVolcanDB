@@ -10,8 +10,9 @@ export function DrawerNavRepartidor({ abierto, alCerrar }) {
   const { carrito } = useCarrito()
   const { usuario, cerrar } = useSesion()
   const cantidadTotal = carrito.reduce((acc, item) => acc + item.cantidad, 0)
-  const esAdmin =
-    String(usuario?.rol || usuario?.perfil || '').toLowerCase() === 'admin'
+  const rolNormalizado = String(usuario?.rol || usuario?.perfil || '').toLowerCase()
+  const esAdmin = Boolean(usuario) && rolNormalizado === 'admin'
+  const esCliente = Boolean(usuario) && rolNormalizado === 'cliente'
 
   if (!abierto) return null
 
@@ -136,14 +137,16 @@ export function DrawerNavRepartidor({ abierto, alCerrar }) {
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={() => irA('/seguimiento')}
-            className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
-          >
-            <span className="text-base">📍</span>
-            <span>Seguimiento de Clientes</span>
-          </button>
+          {esCliente && (
+            <button
+              type="button"
+              onClick={() => irA('/seguimiento')}
+              className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3.5 py-2.5 text-left font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
+            >
+              <span className="text-base">📍</span>
+              <span>Seguimiento de Clientes</span>
+            </button>
+          )}
 
           <div className="my-2 border-t border-white/10" />
 

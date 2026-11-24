@@ -5,6 +5,7 @@ import com.elvolcan.ms_auth.model.SesionAuth;
 import com.elvolcan.ms_auth.repository.SesionAuthRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,11 +55,11 @@ public class MongoAuthConfig {
     }
 
     @Bean
-    public BeforeConvertCallback<SesionAuth> asignarIdSecuencialSesion(MongoTemplate mongoTemplate) {
+    public BeforeConvertCallback<SesionAuth> asignarIdSecuencialSesion(ObjectProvider<MongoTemplate> mongoTemplateProvider) {
         return (entidad, coleccion) -> {
             if (entidad.getId() == null) {
                 Query query = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);
-                SesionAuth ultimo = mongoTemplate.findOne(query, SesionAuth.class, coleccion);
+                SesionAuth ultimo = mongoTemplateProvider.getObject().findOne(query, SesionAuth.class, coleccion);
                 long siguienteId = (ultimo != null && ultimo.getId() != null) ? ultimo.getId() + 1L : 1L;
                 entidad.setId(siguienteId);
             }

@@ -7,6 +7,8 @@ import {
   calcularRumbo,
   obtenerRutaOSRM,
   ventaAEntrega,
+  cargarEntregaRealDesdeBackend,
+  crearEntregaTestInicial,
 } from '../service/repartoService.js'
 
 describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
@@ -131,5 +133,30 @@ describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
     expect(ruta.puntos.length).toBeGreaterThan(5)
     expect(ruta.pasos.length).toBeGreaterThan(0)
     expect(ruta.distanciaKm).toBe(2.4)
+  })
+
+  it('cargarEntregaRealDesdeBackend devuelve null si el cliente no tiene pedidos reales (sin fallback a demo)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      })
+    )
+
+    const resultado = await cargarEntregaRealDesdeBackend(null, {
+      id: 4,
+      idUsuario: 4,
+      rol: 'cliente',
+    })
+    expect(resultado).toBeNull()
+  })
+
+  it('crearEntregaTestInicial entrega una simulación aislada con código TEST-1024', () => {
+    const testData = crearEntregaTestInicial()
+    expect(testData.esDemo).toBe(true)
+    expect(testData.codigoVenta).toBe('TEST-1024')
+    expect(testData.estado).toBe('en_camino')
+    expect(localStorage.getItem('el_volcan_entrega_activa')).toBeNull()
   })
 })

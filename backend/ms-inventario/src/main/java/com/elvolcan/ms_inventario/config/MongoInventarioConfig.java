@@ -9,6 +9,7 @@ import com.elvolcan.ms_inventario.repository.InventarioRepository;
 import com.elvolcan.ms_inventario.repository.MovimientoInventarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,11 +59,11 @@ public class MongoInventarioConfig {
     }
 
     @Bean
-    public BeforeConvertCallback<Inventario> asignarIdSecuencialInventario(MongoTemplate mongoTemplate) {
+    public BeforeConvertCallback<Inventario> asignarIdSecuencialInventario(ObjectProvider<MongoTemplate> mongoTemplateProvider) {
         return (entidad, coleccion) -> {
             if (entidad.getId() == null) {
                 Query query = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);
-                Inventario ultimo = mongoTemplate.findOne(query, Inventario.class, coleccion);
+                Inventario ultimo = mongoTemplateProvider.getObject().findOne(query, Inventario.class, coleccion);
                 long siguienteId = (ultimo != null && ultimo.getId() != null) ? ultimo.getId() + 1L : 1L;
                 entidad.setId(siguienteId);
             }
@@ -71,11 +72,11 @@ public class MongoInventarioConfig {
     }
 
     @Bean
-    public BeforeConvertCallback<MovimientoInventario> asignarIdSecuencialMovimiento(MongoTemplate mongoTemplate) {
+    public BeforeConvertCallback<MovimientoInventario> asignarIdSecuencialMovimiento(ObjectProvider<MongoTemplate> mongoTemplateProvider) {
         return (entidad, coleccion) -> {
             if (entidad.getId() == null) {
                 Query query = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);
-                MovimientoInventario ultimo = mongoTemplate.findOne(query, MovimientoInventario.class, coleccion);
+                MovimientoInventario ultimo = mongoTemplateProvider.getObject().findOne(query, MovimientoInventario.class, coleccion);
                 long siguienteId = (ultimo != null && ultimo.getId() != null) ? ultimo.getId() + 1L : 1L;
                 entidad.setId(siguienteId);
             }

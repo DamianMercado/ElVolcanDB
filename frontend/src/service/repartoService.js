@@ -414,6 +414,82 @@ export async function cargarEntregaDesdeBackend(identificador = null, usuario = 
 }
 
 /**
+ * Carga únicamente entregas REALES desde ms-venta (sin fallback a datos demo).
+ * Retorna null si el cliente no tiene pedidos o si el código no existe.
+ */
+export async function cargarEntregaRealDesdeBackend(
+  identificador = null,
+  usuario = null
+) {
+  if (identificador) {
+    const idStr = String(identificador).replace('#', '').trim()
+    const venta = /^\d+$/.test(idStr)
+      ? await obtenerPedidoPorId(idStr)
+      : await obtenerPedidoPorCodigo(idStr)
+    return venta ? ventaAEntrega(venta) : null
+  }
+
+  const idUsuario = usuario?.idUsuario ?? usuario?.id
+  if (idUsuario && /^\d+$/.test(String(idUsuario))) {
+    try {
+      const pedidosUsuario = await obtenerPedidosPorUsuario(idUsuario)
+      if (Array.isArray(pedidosUsuario) && pedidosUsuario.length > 0) {
+        const ordenados = [...pedidosUsuario].sort(
+          (a, b) => Number(b.id || 0) - Number(a.id || 0)
+        )
+        const preferido =
+          ordenados.find((p) => p.estado !== 'Cancelada') || ordenados[0]
+        return ventaAEntrega(preferido)
+      }
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+/**
+ * Genera una copia aislada de datos de prueba para la vista Test de Seguimiento
+ * (no modifica localStorage ni afecta al seguimiento real del cliente).
+ */
+export function crearEntregaTestInicial() {
+  return {
+    ...ENTREGA_EJEMPLO,
+    id: 'TEST-1024',
+    codigoVenta: 'TEST-1024',
+    esDemo: true,
+    estado: 'en_camino',
+    fecha: fechaDeHoy(),
+    fechaVentaChile: new Date().toISOString(),
+    etaMinutos: 9,
+    distanciaKm: 2.4,
+    velocidadActualKmH: 42,
+    cliente: {
+      ...ENTREGA_EJEMPLO.cliente,
+      coordenadas: { ...COORDENADAS_CLIENTE_DESTINO },
+    },
+    origen: { ...COORDENADAS_PLANTA_ORIGEN },
+    repartidor: { ...ENTREGA_EJEMPLO.repartidor, asignado: true },
+    items: ENTREGA_EJEMPLO.items.map((it) => ({ ...it })),
+    posicionActual: {
+      lat: COORDENADAS_PLANTA_ORIGEN.lat,
+      lng: COORDENADAS_PLANTA_ORIGEN.lng,
+      indicePunto: 0,
+      rumbo: 185,
+    },
+    auditoria: [
+      {
+        evento: 'TEST_INICIADO',
+        descripcion: 'Simulación de seguimiento iniciada desde Planta El Volcán',
+        fecha_chile: new Date().toISOString(),
+      },
+    ],
+    ultimaActualizacion: new Date().toISOString(),
+  }
+}
+
+/**
  * Obtiene la cola real de entregas desde ms-venta para la consola del repartidor
  */
 export async function listarEntregasParaRepartidor(usuario = null) {

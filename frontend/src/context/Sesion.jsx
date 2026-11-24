@@ -115,8 +115,9 @@ export const SesionProvider = ({ children }) => {
   }, [token, limpiarEstadoLocal])
 
   const rolNormalizado = (usuario?.rol || usuario?.perfil || '').toLowerCase()
-  const esAdmin = rolNormalizado === 'admin'
-  const esRepartidor = rolNormalizado === 'repartidor'
+  const esAdmin = Boolean(usuario) && rolNormalizado === 'admin'
+  const esRepartidor = Boolean(usuario) && rolNormalizado === 'repartidor'
+  const esCliente = Boolean(usuario) && rolNormalizado === 'cliente'
 
   return (
     <SesionContext.Provider
@@ -126,6 +127,7 @@ export const SesionProvider = ({ children }) => {
         activa: Boolean(usuario),
         esAdmin,
         esRepartidor,
+        esCliente,
         iniciar,
         cerrar,
       }}
@@ -144,8 +146,9 @@ export const useSesion = () => {
       token: LeerToken(),
       usuario: usuarioActual,
       activa: Boolean(usuarioActual),
-      esAdmin: rol === 'admin',
-      esRepartidor: rol === 'repartidor',
+      esAdmin: Boolean(usuarioActual) && rol === 'admin',
+      esRepartidor: Boolean(usuarioActual) && rol === 'repartidor',
+      esCliente: Boolean(usuarioActual) && rol === 'cliente',
       iniciar: (nuevoToken, usr) => {
         GuardarToken(nuevoToken)
         const dec = UsuarioDesdeToken(nuevoToken)

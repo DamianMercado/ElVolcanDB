@@ -23,20 +23,34 @@ export const Navbar = () => {
     }
 
     window.addEventListener('sesion_cambiada', sincronizarSesion)
+    window.addEventListener('sesion_expirada', sincronizarSesion)
     window.addEventListener('storage', sincronizarSesion)
     return () => {
       window.removeEventListener('sesion_cambiada', sincronizarSesion)
+      window.removeEventListener('sesion_expirada', sincronizarSesion)
       window.removeEventListener('storage', sincronizarSesion)
     }
   }, [location.pathname])
 
   const cantidadTotal = carrito.reduce((acc, item) => acc + item.cantidad, 0)
-  const esAdmin =
-    String(usuario?.rol || usuario?.perfil || '').toLowerCase() === 'admin'
+  const rolNormalizado = String(usuario?.rol || usuario?.perfil || '').toLowerCase()
+  const esAdmin = Boolean(usuario) && rolNormalizado === 'admin'
+  const esCliente = Boolean(usuario) && rolNormalizado === 'cliente'
+  const esRepartidor = Boolean(usuario) && rolNormalizado === 'repartidor'
 
   const irA = (ruta) => {
     setMenuMovilAbierto(false)
     navigate(ruta)
+  }
+
+  const irASeguimiento = () => {
+    if (!esCliente) return
+    irA('/seguimiento')
+  }
+
+  const irARepartidor = () => {
+    if (!esRepartidor) return
+    irA('/repartidor')
   }
 
   const cerrarSesionActiva = () => {
@@ -87,20 +101,24 @@ export const Navbar = () => {
             >
               Productos
             </button>
-            <button
-              type="button"
-              onClick={() => irA('/seguimiento')}
-              className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap text-white/85 transition hover:bg-white/10 hover:text-white"
-            >
-              Seguimiento
-            </button>
-            <button
-              type="button"
-              onClick={() => irA('/repartidor')}
-              className="flex items-center gap-1.5 cursor-pointer rounded-lg bg-emerald-600/30 border border-emerald-400/40 px-2.5 py-1.5 text-xs font-bold whitespace-nowrap text-emerald-300 transition hover:bg-emerald-600/50 hover:text-white"
-            >
-              <span>🚚 Reparto</span>
-            </button>
+            {esCliente && (
+              <button
+                type="button"
+                onClick={irASeguimiento}
+                className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Seguimiento
+              </button>
+            )}
+            {esRepartidor && (
+              <button
+                type="button"
+                onClick={irARepartidor}
+                className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Reparto
+              </button>
+            )}
 
             {esAdmin && (
               <div className="mx-1.5 flex items-center gap-1.5 border-x border-white/15 px-3">
@@ -185,20 +203,24 @@ export const Navbar = () => {
             >
               Productos
             </button>
-            <button
-              type="button"
-              onClick={() => irA('/seguimiento')}
-              className="w-full cursor-pointer rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
-            >
-              Seguimiento de Despacho
-            </button>
-            <button
-              type="button"
-              onClick={() => irA('/repartidor')}
-              className="w-full cursor-pointer rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold text-emerald-400 transition hover:bg-white/10 hover:text-white"
-            >
-              🚚 Modo Repartidor (GPS en vivo)
-            </button>
+            {esCliente && (
+              <button
+                type="button"
+                onClick={irASeguimiento}
+                className="w-full cursor-pointer rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Seguimiento de Despacho
+              </button>
+            )}
+            {esRepartidor && (
+              <button
+                type="button"
+                onClick={irARepartidor}
+                className="w-full cursor-pointer rounded-lg px-3.5 py-2.5 text-left text-sm font-medium text-white/85 transition hover:bg-white/10 hover:text-white"
+              >
+                Reparto
+              </button>
+            )}
             {esAdmin && (
               <div className="flex flex-col gap-1 border-y border-white/15 py-2">
                 <button

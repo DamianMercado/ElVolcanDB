@@ -9,6 +9,7 @@ import com.mongodb.client.model.ReplaceOptions;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -59,11 +60,11 @@ public class MongoUsuarioConfig {
     }
 
     @Bean
-    public BeforeConvertCallback<Usuario> asignarIdSecuencialUsuario(MongoTemplate mongoTemplate) {
+    public BeforeConvertCallback<Usuario> asignarIdSecuencialUsuario(ObjectProvider<MongoTemplate> mongoTemplateProvider) {
         return (entidad, coleccion) -> {
             if (entidad.getId() == null) {
                 Query query = new Query().with(Sort.by(Sort.Direction.DESC, "_id")).limit(1);
-                Usuario ultimo = mongoTemplate.findOne(query, Usuario.class, coleccion);
+                Usuario ultimo = mongoTemplateProvider.getObject().findOne(query, Usuario.class, coleccion);
                 long siguienteId = (ultimo != null && ultimo.getId() != null) ? ultimo.getId() + 1L : 1L;
                 entidad.setId(siguienteId);
             }

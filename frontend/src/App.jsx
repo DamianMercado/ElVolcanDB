@@ -17,6 +17,7 @@ import { AdminProductosLista } from './pages/AdminProductosLista.jsx'
 import { AdminProductoFormulario } from './pages/AdminProductoFormulario.jsx'
 import { Repartidor } from './pages/Repartidor.jsx'
 import { SeguimientoPedido } from './pages/SeguimientoPedido.jsx'
+import { TestSeguimiento } from './pages/TestSeguimiento.jsx'
 
 export function App() {
   return (
@@ -34,8 +35,13 @@ export function App() {
               <Route path="/pedido-creado" element={<PedidoCreado />} />
 
               {/* Rutas interactivas de despacho y seguimiento con mapa en tiempo real */}
-              <Route path="/repartidor" element={<Repartidor />} />
-              <Route path="/seguimiento" element={<SeguimientoPedido />} />
+              <Route element={<RutaPrivada roles={['repartidor', 'admin']} />}>
+                <Route path="/repartidor" element={<Repartidor />} />
+              </Route>
+              <Route element={<RutaPrivada roles={['cliente']} />}>
+                <Route path="/seguimiento" element={<SeguimientoPedido />} />
+                <Route path="/seguimiento/test" element={<TestSeguimiento />} />
+              </Route>
               <Route path="/seguimiento/:id" element={<SeguimientoPedido />} />
 
               {/* Rutas de autenticación (redirigen si ya hay sesión activa) */}
