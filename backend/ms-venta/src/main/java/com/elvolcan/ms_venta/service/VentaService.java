@@ -358,6 +358,9 @@ public class VentaService {
         if (request.getVelocidadKmH() != null) {
             entrega.put("velocidad_kmh", request.getVelocidadKmH());
         }
+        if (request.getAlertasRuta() != null) {
+            entrega.put("alertas_ruta", request.getAlertasRuta());
+        }
 
         String estadoAnterior = String.valueOf(entrega.getOrDefault("estado_despacho", "pendiente"));
         if (request.getEstadoDespacho() != null && !request.getEstadoDespacho().isBlank()) {

@@ -1,17 +1,36 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import {
   COORDENADAS_PLANTA_ORIGEN,
   COORDENADAS_CLIENTE_DESTINO,
   obtenerRutaOSRM,
+  obtenerAlertasRutaPedido,
+  suscribirAlertasRuta,
 } from '../../service/repartoService'
-import { Variables } from '../../config/variables'
+import {
+  PALETA_MAPA_UBER,
+  sincronizarCapasMapa,
+} from '../../utils/mapaTiles'
 
-const CARTO_API_KEY = Variables.cartoApiKey
+const escaparHtml = (texto = '') =>
+  String(texto)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 
-const obtenerUrlTilesCliente = () => {
-  const queryParam = CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : ''
-  return `https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png${queryParam}`
+const crearIconoAlertaSoloLectura = (color = '#FFC043', textoColor = '#121212') => {
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9999px;background:${color};color:${textoColor};box-shadow:0 4px 12px rgba(0,0,0,0.42);font-weight:900;font-size:14px;">
+        !
+      </div>
+    `,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -16],
+  })
 }
 
 const crearIconoCamionCliente = (rumbo = 0) => {
@@ -67,8 +86,32 @@ export function MapaSeguimientoCliente({ entrega }) {
   const mapaRef = useRef(null)
   const marcadorCamionRef = useRef(null)
   const marcadorDestinoRef = useRef(null)
+  const marcadoresAlertasRef = useRef([])
   const lineaRutaRef = useRef(null)
+  const capasTilesRef = useRef({ base: null, etiquetas: null })
   const [rutaPuntos, setRutaPuntos] = useState([])
+  const [modoOscuro, setModoOscuro] = useState(true)
+  const [alertasVivoPorPedido, setAlertasVivoPorPedido] = useState({})
+
+  const codigoPedido = String(entrega?.codigoVenta || entrega?.id || '')
+  const alertasProp = entrega?.alertasRuta
+
+  useEffect(() => {
+    if (!codigoPedido) return undefined
+    return suscribirAlertasRuta(codigoPedido, (nuevas) => {
+      setAlertasVivoPorPedido((prev) => ({ ...prev, [codigoPedido]: nuevas }))
+    })
+  }, [codigoPedido])
+
+  const alertasRuta = useMemo(() => {
+    if (codigoPedido && alertasVivoPorPedido[codigoPedido] !== undefined) {
+      return alertasVivoPorPedido[codigoPedido]
+    }
+    if (Array.isArray(alertasProp)) {
+      return alertasProp
+    }
+    return codigoPedido ? obtenerAlertasRutaPedido(codigoPedido) : []
+  }, [codigoPedido, alertasVivoPorPedido, alertasProp])
 
   const origenLat = entrega?.origen?.lat ?? COORDENADAS_PLANTA_ORIGEN.lat
   const origenLng = entrega?.origen?.lng ?? COORDENADAS_PLANTA_ORIGEN.lng
@@ -87,12 +130,7 @@ export function MapaSeguimientoCliente({ entrega }) {
       zoomControl: false,
     })
 
-    L.tileLayer(obtenerUrlTilesCliente(), {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 19,
-      subdomains: 'abcd',
-    }).addTo(mapa)
+    sincronizarCapasMapa(mapa, capasTilesRef, true)
 
     L.control.zoom({ position: 'bottomright' }).addTo(mapa)
 
@@ -120,7 +158,7 @@ export function MapaSeguimientoCliente({ entrega }) {
     marcadorCamionRef.current = marcadorCamion
 
     const lineaRuta = L.polyline([], {
-      color: '#2171ec',
+      color: PALETA_MAPA_UBER.noche.rutaActiva,
       weight: 6,
       opacity: 0.95,
       lineCap: 'round',
@@ -131,10 +169,49 @@ export function MapaSeguimientoCliente({ entrega }) {
     mapaRef.current = mapa
 
     return () => {
+      marcadoresAlertasRef.current.forEach((m) => m.remove())
+      marcadoresAlertasRef.current = []
       mapa.remove()
       mapaRef.current = null
+      capasTilesRef.current = { base: null, etiquetas: null }
     }
   }, [])
+
+  // Mostrar alertas reportadas por el repartidor en modo solo lectura sobre el mapa
+  useEffect(() => {
+    marcadoresAlertasRef.current.forEach((m) => m.remove())
+    marcadoresAlertasRef.current = []
+    if (!mapaRef.current || !alertasRuta.length) return
+
+    alertasRuta.forEach((alerta) => {
+      const marcador = L.marker([alerta.lat, alerta.lng], {
+        icon: crearIconoAlertaSoloLectura(alerta.color, alerta.textoColor),
+        zIndexOffset: 850,
+      })
+        .bindPopup(
+          `<div class="p-1 text-xs">
+            <strong style="color:${escaparHtml(alerta.color)};font-weight:800;">${escaparHtml(alerta.etiqueta)}</strong>
+            <p class="text-slate-600 mt-0.5">Aviso del repartidor${alerta.horaChile ? ` · ${escaparHtml(alerta.horaChile)}` : ''}</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">Información en tiempo real (solo lectura)</p>
+          </div>`
+        )
+        .addTo(mapaRef.current)
+      marcadoresAlertasRef.current.push(marcador)
+    })
+  }, [alertasRuta])
+
+  // Cambiar tema del mapa (Nocturno / Día) y color de ruta activa
+  useEffect(() => {
+    if (!mapaRef.current) return
+    sincronizarCapasMapa(mapaRef.current, capasTilesRef, modoOscuro)
+    if (lineaRutaRef.current) {
+      lineaRutaRef.current.setStyle({
+        color: modoOscuro
+          ? PALETA_MAPA_UBER.noche.rutaActiva
+          : PALETA_MAPA_UBER.dia.rutaActiva,
+      })
+    }
+  }, [modoOscuro])
 
   // 2. Cargar trazado OSRM según origen y destino del pedido actual
   useEffect(() => {
@@ -213,32 +290,140 @@ export function MapaSeguimientoCliente({ entrega }) {
     }
   }
 
+  const colorPuntoEstado =
+    entrega?.estado === 'entregado'
+      ? PALETA_MAPA_UBER.dinamica.traficoFluidoClaro
+      : entrega?.estado === 'cancelado'
+      ? PALETA_MAPA_UBER.dinamica.traficoDetenido
+      : entrega?.estado === 'llegando'
+      ? PALETA_MAPA_UBER.dinamica.demandaModerada
+      : modoOscuro
+      ? PALETA_MAPA_UBER.noche.rutaActiva
+      : PALETA_MAPA_UBER.dia.rutaActiva
+
+  const enfocarUltimaAlerta = () => {
+    if (!mapaRef.current || alertasRuta.length === 0) return
+    const ultima = alertasRuta[alertasRuta.length - 1]
+    mapaRef.current.setView([ultima.lat, ultima.lng], 16, { animate: true })
+    const marcadorUltimo =
+      marcadoresAlertasRef.current[marcadoresAlertasRef.current.length - 1]
+    marcadorUltimo?.openPopup()
+  }
+
+  const ultimaAlerta =
+    alertasRuta.length > 0 ? alertasRuta[alertasRuta.length - 1] : null
+
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-2xl border border-[#e7e8ec] shadow-md mapa-estilo-uber">
+    <div
+      className={`relative h-full w-full overflow-hidden rounded-2xl shadow-md ${
+        modoOscuro
+          ? 'mapa-noche-superficie bg-[#121212]'
+          : 'mapa-dia-superficie bg-[#F6F6F6]'
+      }`}
+    >
       <div ref={contenedorRef} className="h-full min-h-[420px] w-full" />
 
-      <button
-        type="button"
-        onClick={reenfocar}
-        title="Centrar en el recorrido"
-        className="absolute top-4 right-4 z-20 flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white text-[#121212] border border-[#e7e8ec] shadow-md transition hover:bg-[#e7e8ec]/40 hover:text-[#2171ec] active:scale-95"
-      >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
+      {/* Aviso de solo lectura de alertas reportadas por el repartidor */}
+      {ultimaAlerta && (
+        <div className="pointer-events-none absolute top-4 left-4 z-20 max-w-[72%]">
+          <button
+            type="button"
+            onClick={enfocarUltimaAlerta}
+            title="Ver aviso del repartidor en el mapa"
+            className={`pointer-events-auto inline-flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-xs shadow-lg backdrop-blur-md transition active:scale-95 ${
+              modoOscuro
+                ? 'bg-[#121212]/92 text-white hover:bg-[#242629]'
+                : 'bg-white/95 text-[#121212] hover:bg-[#F6F6F6]'
+            }`}
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: ultimaAlerta.color }}
+            />
+            <span className="truncate font-bold">{ultimaAlerta.etiqueta}</span>
+            {ultimaAlerta.horaChile && (
+              <span
+                className={`shrink-0 text-[10px] font-semibold ${
+                  modoOscuro ? 'text-[#AFAFAF]' : 'text-[#545454]'
+                }`}
+              >
+                {ultimaAlerta.horaChile}
+              </span>
+            )}
+            {alertasRuta.length > 1 && (
+              <span className="shrink-0 rounded-full bg-[#276EF1] px-1.5 py-0.5 text-[10px] font-black text-white">
+                +{alertasRuta.length - 1}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Controles flotantes del mapa */}
+      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={reenfocar}
+          title="Centrar en el recorrido"
+          aria-label="Centrar en el recorrido"
+          className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl shadow-md transition active:scale-95 ${
+            modoOscuro
+              ? 'bg-[#121212]/90 text-[#AFAFAF] hover:bg-[#242629] hover:text-[#4788FF]'
+              : 'bg-white text-[#545454] hover:bg-[#F6F6F6] hover:text-[#276EF1]'
+          }`}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setModoOscuro((prev) => !prev)}
+          title={modoOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo nocturno'}
+          aria-label={modoOscuro ? 'Cambiar a modo claro' : 'Cambiar a modo nocturno'}
+          aria-pressed={modoOscuro}
+          className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl shadow-md transition active:scale-95 ${
+            modoOscuro
+              ? 'bg-[#121212]/90 text-[#FFC043] hover:bg-[#242629]'
+              : 'bg-white text-[#545454] hover:bg-[#F6F6F6]'
+          }`}
+        >
+          {modoOscuro ? (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          ) : (
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {/* Overlay inferior con estado dinámico */}
       <div className="pointer-events-none absolute right-4 bottom-4 left-4 z-20">
-        <div className="pointer-events-auto flex items-center justify-between rounded-xl border border-[#e7e8ec] bg-white/95 px-4 py-3 shadow-lg backdrop-blur-md">
+        <div
+          className={`pointer-events-auto flex items-center justify-between rounded-xl px-4 py-3 shadow-lg backdrop-blur-md transition-colors ${
+            modoOscuro
+              ? 'bg-[#121212]/92 text-white'
+              : 'bg-white/95 text-[#121212]'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <span className="relative flex h-3.5 w-3.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2171ec] opacity-75"></span>
-              <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-[#2171ec]"></span>
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                style={{ backgroundColor: colorPuntoEstado }}
+              />
+              <span
+                className="relative inline-flex h-3.5 w-3.5 rounded-full"
+                style={{ backgroundColor: colorPuntoEstado }}
+              />
             </span>
             <div>
-              <p className="text-xs font-bold text-[#121212]">
+              <p className={`text-xs font-bold ${modoOscuro ? 'text-white' : 'text-[#121212]'}`}>
                 {entrega?.estado === 'entregado'
                   ? '¡Pedido Entregado con Éxito!'
                   : entrega?.estado === 'cancelado'
@@ -249,14 +434,24 @@ export function MapaSeguimientoCliente({ entrega }) {
                   ? 'Esperando asignación de repartidor en planta'
                   : 'Repartidor en camino a tu domicilio'}
               </p>
-              <p className="text-[11px] text-[#adadad]">
+              <p className={`text-[11px] ${modoOscuro ? 'text-[#AFAFAF]' : 'text-[#545454]'}`}>
                 {entrega?.repartidor?.nombre} • {entrega?.cliente?.direccion}
               </p>
             </div>
           </div>
 
           <div className="text-right">
-            <span className="text-sm font-black text-[#2171ec]">
+            <span
+              className={`text-sm font-black ${
+                entrega?.estado === 'entregado'
+                  ? 'text-[#3AA76D]'
+                  : entrega?.estado === 'cancelado'
+                  ? 'text-[#E11900]'
+                  : modoOscuro
+                  ? 'text-[#4788FF]'
+                  : 'text-[#276EF1]'
+              }`}
+            >
               {entrega?.estado === 'entregado'
                 ? 'Entregado'
                 : entrega?.estado === 'cancelado'
@@ -265,7 +460,7 @@ export function MapaSeguimientoCliente({ entrega }) {
                 ? 'En planta'
                 : `~${entrega?.etaMinutos ?? 8} min`}
             </span>
-            <p className="text-[10px] text-[#adadad]">
+            <p className={`text-[10px] ${modoOscuro ? 'text-[#AFAFAF]' : 'text-[#545454]'}`}>
               {entrega?.estado === 'entregado'
                 ? 'Completado'
                 : entrega?.estado === 'cancelado'

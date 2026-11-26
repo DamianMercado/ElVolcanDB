@@ -1,68 +1,89 @@
 package com.elvolcan.ms_usuario.model;
 
 import com.elvolcan.ms_usuario.enums.RolUsuario;
+import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
+import org.hibernate.type.NumericBooleanConverter;
 
-import java.util.Map;
+import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Document(collection = "usuario")
+@Entity
+@Table(
+        name = "usuario",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_usuario_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_usuario_rut", columnNames = "rut")
+        },
+        indexes = @Index(name = "idx_usuario_rol", columnList = "rol")
+)
 public class Usuario {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Field("nombre")
+    @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @Field("apellido")
+    @Column(name = "apellido", nullable = false, length = 100)
     private String apellido;
 
-    @Field("password")
+    @Column(name = "password", nullable = false, length = 255)
     private String password;
 
-    @Indexed(unique = true)
-    @Field("email")
+    @Column(name = "email", nullable = false, length = 150, unique = true)
     private String email;
 
-    @Indexed(unique = true)
-    @Field("rut")
+    @Column(name = "rut", length = 20, unique = true)
     private String rut;
 
-    @Field("telefono")
+    @Column(name = "telefono", length = 40)
     private String telefono;
 
-    @Field("direccion")
+    @Column(name = "direccion", length = 250)
     private String direccion;
 
-    @Field("comuna")
+    @Column(name = "comuna", length = 100)
     private String comuna;
 
-    @Field("rol")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rol", nullable = false, length = 30)
     private RolUsuario rol;
 
-    @Field("tipo_cliente")
+    @Column(name = "tipo_cliente", length = 40)
     private String tipoCliente;
 
-    @Field("id_zona")
+    @Column(name = "id_zona")
     private Integer idZona;
 
-    @Field("patente_camion")
+    @Column(name = "patente_camion", length = 30)
     private String patenteCamion;
 
-    @Field("ubicacion_actual")
-    private Map<String, Object> ubicacionActual;
+    @Column(name = "lat_actual", precision = 10, scale = 6)
+    private BigDecimal latActual;
 
-    @Field("activo")
-    private Boolean activo;
+    @Column(name = "lng_actual", precision = 10, scale = 6)
+    private BigDecimal lngActual;
+
+    @Convert(converter = NumericBooleanConverter.class)
+    @Column(name = "activo", nullable = false)
+    @Builder.Default
+    private Boolean activo = true;
 }

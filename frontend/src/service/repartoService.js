@@ -12,6 +12,129 @@ import { fechaDeHoy } from '../utils/formato'
 
 const CLAVE_ENTREGA_REPARTO = 'el_volcan_entrega_activa'
 const EVENTO_REPARTO = 'reparto_actualizado'
+const CLAVE_ALERTAS_PREFIX = 'el_volcan_alertas_ruta_'
+const EVENTO_ALERTAS = 'reparto_alertas_actualizadas'
+
+const normalizarCodigoAlerta = (codigo) =>
+  String(codigo || '')
+    .replace('#', '')
+    .trim()
+    .toUpperCase()
+
+export const normalizarAlertasRuta = (lista) => {
+  if (!Array.isArray(lista)) return []
+  return lista
+    .filter(
+      (a) =>
+        a &&
+        typeof a.lat === 'number' &&
+        typeof a.lng === 'number' &&
+        typeof a.etiqueta === 'string' &&
+        a.etiqueta.trim().length > 0
+    )
+    .map((a, idx) => ({
+      id: String(a.id || `alerta-${idx}-${a.lat}-${a.lng}`),
+      tipo: String(a.tipo || 'alerta'),
+      etiqueta: a.etiqueta.trim(),
+      color: String(a.color || '#FFC043'),
+      textoColor: String(a.textoColor || '#121212'),
+      lat: a.lat,
+      lng: a.lng,
+      horaChile: String(a.horaChile || ''),
+      reportadoPor: String(a.reportadoPor || 'Repartidor'),
+    }))
+}
+
+export function obtenerAlertasRutaPedido(codigoVenta) {
+  const clave = normalizarCodigoAlerta(codigoVenta)
+  if (!clave) return []
+  try {
+    const raw = localStorage.getItem(`${CLAVE_ALERTAS_PREFIX}${clave}`)
+    return raw ? normalizarAlertasRuta(JSON.parse(raw)) : []
+  } catch {
+    return []
+  }
+}
+
+export function guardarAlertasRutaPedido(codigoVenta, alertas = []) {
+  const clave = normalizarCodigoAlerta(codigoVenta)
+  const limpias = normalizarAlertasRuta(alertas)
+  if (!clave) return limpias
+  try {
+    localStorage.setItem(`${CLAVE_ALERTAS_PREFIX}${clave}`, JSON.stringify(limpias))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(EVENTO_ALERTAS, {
+          detail: { codigoVenta: clave, alertas: limpias },
+        })
+      )
+    }
+  } catch {
+    // Ignorar errores de cuota de almacenamiento
+  }
+  return limpias
+}
+
+export function suscribirAlertasRuta(codigoVenta, callback) {
+  const clave = normalizarCodigoAlerta(codigoVenta)
+  if (!clave || typeof window === 'undefined') return () => {}
+
+  const manejadorCustom = (e) => {
+    if (normalizarCodigoAlerta(e?.detail?.codigoVenta) === clave) {
+      callback(normalizarAlertasRuta(e.detail.alertas))
+    }
+  }
+  const manejadorStorage = (e) => {
+    if (e.key === `${CLAVE_ALERTAS_PREFIX}${clave}`) {
+      try {
+        callback(e.newValue ? normalizarAlertasRuta(JSON.parse(e.newValue)) : [])
+      } catch {
+        // Ignorar
+      }
+    }
+  }
+
+  window.addEventListener(EVENTO_ALERTAS, manejadorCustom)
+  window.addEventListener('storage', manejadorStorage)
+
+  return () => {
+    window.removeEventListener(EVENTO_ALERTAS, manejadorCustom)
+    window.removeEventListener('storage', manejadorStorage)
+  }
+}
+
+export async function sincronizarAlertasRutaConBackend(entrega, alertas = []) {
+  const codigo = entrega?.codigoVenta || entrega?.id
+  const limpias = guardarAlertasRutaPedido(codigo, alertas)
+
+  // Actualizar también la entrega activa en localStorage si coincide
+  try {
+    const raw = localStorage.getItem(CLAVE_ENTREGA_REPARTO)
+    if (raw) {
+      const actual = JSON.parse(raw)
+      if (normalizarCodigoAlerta(actual?.codigoVenta) === normalizarCodigoAlerta(codigo)) {
+        guardarEntregaActiva({ ...actual, alertasRuta: limpias })
+      }
+    }
+  } catch {
+    // Ignorar
+  }
+
+  const ventaId = entrega?.ventaId
+  if (!ventaId) return limpias
+
+  try {
+    await actualizarSeguimientoPedido(ventaId, {
+      alertasRuta: limpias,
+      ...(entrega.repartidor?.asignado && entrega.repartidor?.nombre
+        ? { repartidor: entrega.repartidor.nombre }
+        : {}),
+    })
+  } catch {
+    // Se mantienen disponibles localmente en caso de error temporal de red
+  }
+  return limpias
+}
 
 // Coordenadas reales en Puente Alto (Santiago de Chile) para trazado de ruta
 export const COORDENADAS_PLANTA_ORIGEN = {
@@ -137,6 +260,7 @@ export const ENTREGA_EJEMPLO = {
     rumbo: 185,
   },
   auditoria: [],
+  alertasRuta: [],
   ultimaActualizacion: new Date().toISOString(),
 }
 
@@ -307,6 +431,11 @@ export function ventaAEntrega(venta) {
       rumbo: Number(posBackend.rumbo ?? 180),
     },
     auditoria: Array.isArray(venta.auditoria) ? venta.auditoria : [],
+    alertasRuta: Array.isArray(ent.alertas_ruta)
+      ? normalizarAlertasRuta(ent.alertas_ruta)
+      : obtenerAlertasRutaPedido(
+          String(venta.codigo || venta.codigoVenta || `EV-${venta.id}`)
+        ),
     ultimaActualizacion:
       ent.ultima_actualizacion_chile || venta.fechaVentaChile || new Date().toISOString(),
   }
@@ -755,4 +884,364 @@ export function calcularRumbo(lat1, lon1, lat2, lon2) {
       Math.cos(dLon)
   const brng = (Math.atan2(y, x) * 180) / Math.PI
   return (brng + 360) % 360
+}
+
+/**
+ * Calcula la distancia estimada en km por trama urbana entre dos puntos lat/lng (Haversine * factor vial 1.28)
+ */
+export function calcularDistanciaKm(lat1, lng1, lat2, lng2) {
+  if (
+    typeof lat1 !== 'number' ||
+    typeof lng1 !== 'number' ||
+    typeof lat2 !== 'number' ||
+    typeof lng2 !== 'number'
+  ) {
+    return 0
+  }
+  const R = 6371
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  const recta = R * c
+  return Number((recta * 1.28).toFixed(2))
+}
+
+const resolverOrdenOptimoDesdeMatriz = (matriz) => {
+  const totalNodos = matriz.length
+  const n = totalNodos - 1 // nodo 0 = punto actual, nodos 1..n = pedidos pendientes
+  if (n <= 0) return []
+  if (n === 1) return [0]
+
+  // Programación dinámica exacta (Held-Karp) para hasta 10 paradas pendientes: garantiza óptimo global
+  if (n <= 10) {
+    const estados = 1 << n
+    const dp = Array.from({ length: estados }, () => new Float64Array(n).fill(Infinity))
+    const padre = Array.from({ length: estados }, () => new Int8Array(n).fill(-1))
+
+    for (let i = 0; i < n; i++) {
+      dp[1 << i][i] = matriz[0][i + 1]
+    }
+
+    for (let mask = 1; mask < estados; mask++) {
+      for (let ultimo = 0; ultimo < n; ultimo++) {
+        const costoActual = dp[mask][ultimo]
+        if (!Number.isFinite(costoActual)) continue
+        for (let sig = 0; sig < n; sig++) {
+          if (mask & (1 << sig)) continue
+          const sigMask = mask | (1 << sig)
+          const nuevoCosto = costoActual + matriz[ultimo + 1][sig + 1]
+          if (nuevoCosto < dp[sigMask][sig]) {
+            dp[sigMask][sig] = nuevoCosto
+            padre[sigMask][sig] = ultimo
+          }
+        }
+      }
+    }
+
+    const maskFinal = estados - 1
+    let mejorFin = 0
+    let mejorCosto = Infinity
+    for (let i = 0; i < n; i++) {
+      if (dp[maskFinal][i] < mejorCosto) {
+        mejorCosto = dp[maskFinal][i]
+        mejorFin = i
+      }
+    }
+
+    const orden = []
+    let mask = maskFinal
+    let curr = mejorFin
+    while (curr !== -1) {
+      orden.push(curr)
+      const prev = padre[mask][curr]
+      mask ^= 1 << curr
+      curr = prev
+    }
+    return orden.reverse()
+  }
+
+  // Vecino más cercano + mejora 2-opt para colas grandes (> 10 paradas)
+  const visitados = new Set()
+  const ruta = []
+  let nodoActual = 0
+  while (ruta.length < n) {
+    let mejorIdx = -1
+    let mejorDist = Infinity
+    for (let i = 0; i < n; i++) {
+      if (visitados.has(i)) continue
+      const d = matriz[nodoActual][i + 1]
+      if (d < mejorDist) {
+        mejorDist = d
+        mejorIdx = i
+      }
+    }
+    visitados.add(mejorIdx)
+    ruta.push(mejorIdx)
+    nodoActual = mejorIdx + 1
+  }
+
+  const costoRuta = (seq) => {
+    let total = matriz[0][seq[0] + 1]
+    for (let i = 1; i < seq.length; i++) {
+      total += matriz[seq[i - 1] + 1][seq[i] + 1]
+    }
+    return total
+  }
+
+  let mejoro = true
+  while (mejoro) {
+    mejoro = false
+    const base = costoRuta(ruta)
+    for (let i = 0; i < ruta.length - 1; i++) {
+      for (let j = i + 1; j < ruta.length; j++) {
+        const candidata = [
+          ...ruta.slice(0, i),
+          ...ruta.slice(i, j + 1).reverse(),
+          ...ruta.slice(j + 1),
+        ]
+        if (costoRuta(candidata) + 1e-6 < base) {
+          ruta.splice(0, ruta.length, ...candidata)
+          mejoro = true
+          break
+        }
+      }
+      if (mejoro) break
+    }
+  }
+
+  return ruta
+}
+
+const extraerCoordsEntrega = (entrega) => {
+  const c = entrega?.cliente?.coordenadas
+  if (c && typeof c.lat === 'number' && typeof c.lng === 'number') {
+    return { lat: c.lat, lng: c.lng }
+  }
+  return {
+    lat: COORDENADAS_CLIENTE_DESTINO.lat,
+    lng: COORDENADAS_CLIENTE_DESTINO.lng,
+  }
+}
+
+/**
+ * Calcula la mejor ruta óptima de entrega para todos los pedidos pendientes
+ * partiendo desde la ubicación actual del repartidor (o Planta El Volcán).
+ */
+export function calcularMejorRutaEntregas(
+  entregas = [],
+  puntoActual = COORDENADAS_PLANTA_ORIGEN,
+  matrizPersonalizada = null
+) {
+  const origen = {
+    lat:
+      typeof puntoActual?.lat === 'number'
+        ? puntoActual.lat
+        : COORDENADAS_PLANTA_ORIGEN.lat,
+    lng:
+      typeof puntoActual?.lng === 'number'
+        ? puntoActual.lng
+        : COORDENADAS_PLANTA_ORIGEN.lng,
+    nombre: puntoActual?.nombre || COORDENADAS_PLANTA_ORIGEN.nombre,
+    direccion: puntoActual?.direccion || COORDENADAS_PLANTA_ORIGEN.direccion,
+  }
+
+  const pendientes = (Array.isArray(entregas) ? entregas : []).filter(
+    (e) => e && e.estado !== 'entregado' && e.estado !== 'cancelado'
+  )
+
+  if (pendientes.length === 0) {
+    return {
+      origen,
+      paradas: [],
+      distanciaTotalKm: 0,
+      distanciaOriginalKm: 0,
+      ahorroKm: 0,
+      ahorroPorcentaje: 0,
+      duracionTotalMin: 0,
+      ahorroMin: 0,
+      pedidoRecomendado: null,
+      usandoCallesReales: false,
+    }
+  }
+
+  const nodos = [origen, ...pendientes.map(extraerCoordsEntrega)]
+  const totalNodos = nodos.length
+
+  const matrizKm =
+    matrizPersonalizada?.distanciasKm &&
+    matrizPersonalizada.distanciasKm.length === totalNodos
+      ? matrizPersonalizada.distanciasKm
+      : Array.from({ length: totalNodos }, (_, i) =>
+          Array.from({ length: totalNodos }, (_, j) =>
+            i === j
+              ? 0
+              : calcularDistanciaKm(
+                  nodos[i].lat,
+                  nodos[i].lng,
+                  nodos[j].lat,
+                  nodos[j].lng
+                )
+          )
+        )
+
+  const matrizMin =
+    matrizPersonalizada?.duracionesMin &&
+    matrizPersonalizada.duracionesMin.length === totalNodos
+      ? matrizPersonalizada.duracionesMin
+      : matrizKm.map((fila, i) =>
+          fila.map((km, j) =>
+            i === j ? 0 : Math.max(2, Math.round((km / 28) * 60))
+          )
+        )
+
+  // Costo del orden original sin optimizar
+  let distanciaOriginalKm = 0
+  let duracionOriginalMin = 0
+  let nodoPrevOrig = 0
+  for (let i = 0; i < pendientes.length; i++) {
+    distanciaOriginalKm += matrizKm[nodoPrevOrig][i + 1]
+    duracionOriginalMin += matrizMin[nodoPrevOrig][i + 1]
+    nodoPrevOrig = i + 1
+  }
+
+  // Orden óptimo calculado
+  const ordenOptimo = resolverOrdenOptimoDesdeMatriz(matrizKm)
+
+  let distanciaAcumuladaKm = 0
+  let etaAcumuladaMin = 0
+  let nodoPrevOpt = 0
+
+  const paradas = ordenOptimo.map((idxPendiente, pos) => {
+    const nodoDestino = idxPendiente + 1
+    const distanciaTramoKm = Number(
+      matrizKm[nodoPrevOpt][nodoDestino].toFixed(1)
+    )
+    const distanciaDesdeActualKm = Number(
+      matrizKm[0][nodoDestino].toFixed(1)
+    )
+    const etaTramoMin = Math.max(1, Math.round(matrizMin[nodoPrevOpt][nodoDestino]))
+
+    distanciaAcumuladaKm = Number(
+      (distanciaAcumuladaKm + distanciaTramoKm).toFixed(1)
+    )
+    etaAcumuladaMin += etaTramoMin
+    nodoPrevOpt = nodoDestino
+
+    return {
+      orden: pos + 1,
+      esRecomendado: pos === 0,
+      entrega: pendientes[idxPendiente],
+      distanciaTramoKm,
+      distanciaDesdeActualKm,
+      distanciaAcumuladaKm,
+      etaTramoMin,
+      etaAcumuladaMin,
+    }
+  })
+
+  const distanciaTotalKm = Number(distanciaAcumuladaKm.toFixed(1))
+  const distanciaOriginalRedondeada = Number(distanciaOriginalKm.toFixed(1))
+  const ahorroKm = Math.max(
+    0,
+    Number((distanciaOriginalRedondeada - distanciaTotalKm).toFixed(1))
+  )
+  const ahorroPorcentaje =
+    distanciaOriginalRedondeada > 0 && ahorroKm > 0
+      ? Math.round((ahorroKm / distanciaOriginalRedondeada) * 100)
+      : 0
+  const ahorroMin = Math.max(0, Math.round(duracionOriginalMin - etaAcumuladaMin))
+
+  return {
+    origen,
+    paradas,
+    distanciaTotalKm,
+    distanciaOriginalKm: distanciaOriginalRedondeada,
+    ahorroKm,
+    ahorroPorcentaje,
+    duracionTotalMin: etaAcumuladaMin,
+    ahorroMin,
+    pedidoRecomendado: paradas[0]?.entrega || null,
+    usandoCallesReales: Boolean(matrizPersonalizada?.distanciasKm),
+  }
+}
+
+/**
+ * Refina la mejor ruta consultando la matriz real de conducción OSRM Table API.
+ * Si OSRM falla o supera el tiempo límite, retorna el cálculo local instantáneo.
+ */
+export async function calcularMejorRutaConOSRM(
+  entregas = [],
+  puntoActual = COORDENADAS_PLANTA_ORIGEN
+) {
+  const resultadoLocal = calcularMejorRutaEntregas(entregas, puntoActual)
+  const pendientes = (Array.isArray(entregas) ? entregas : []).filter(
+    (e) => e && e.estado !== 'entregado' && e.estado !== 'cancelado'
+  )
+
+  if (pendientes.length < 2 || pendientes.length > 12) {
+    return resultadoLocal
+  }
+
+  const nodos = [resultadoLocal.origen, ...pendientes.map(extraerCoordsEntrega)]
+  const coordsStr = nodos.map((p) => `${p.lng},${p.lat}`).join(';')
+  const url = `https://router.project-osrm.org/table/v1/driving/${coordsStr}?annotations=distance,duration`
+
+  const controlador =
+    typeof AbortController !== 'undefined' ? new AbortController() : null
+  const timer = controlador
+    ? setTimeout(() => controlador.abort(), 3500)
+    : null
+
+  try {
+    const resp = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      ...(controlador ? { signal: controlador.signal } : {}),
+    })
+    if (!resp.ok) return resultadoLocal
+    const datos = await resp.json()
+    if (
+      datos?.code === 'Ok' &&
+      Array.isArray(datos.distances) &&
+      datos.distances.length === nodos.length
+    ) {
+      const distanciasKm = datos.distances.map((fila, i) =>
+        fila.map((metros, j) =>
+          typeof metros === 'number'
+            ? Number((metros / 1000).toFixed(2))
+            : calcularDistanciaKm(
+                nodos[i].lat,
+                nodos[i].lng,
+                nodos[j].lat,
+                nodos[j].lng
+              )
+        )
+      )
+      const duracionesMin = Array.isArray(datos.durations)
+        ? datos.durations.map((fila, i) =>
+            fila.map((seg, j) =>
+              i === j
+                ? 0
+                : typeof seg === 'number'
+                ? Math.max(1, Math.round(seg / 60))
+                : Math.max(2, Math.round((distanciasKm[i][j] / 28) * 60))
+            )
+          )
+        : null
+
+      return calcularMejorRutaEntregas(entregas, puntoActual, {
+        distanciasKm,
+        duracionesMin,
+      })
+    }
+  } catch {
+    // Fallback elegante al cálculo urbano local
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+
+  return resultadoLocal
 }

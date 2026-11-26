@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -84,6 +85,7 @@ public class InventarioService {
         return inventarioMapper.toResponse(inventario);
     }
 
+    @Transactional
     public InventarioResponse crear(InventarioRequest request) {
         log.info("Creando inventario para producto: {}", request.getCodigoProducto());
         if (inventarioRepository.existsByCodigoProductoIgnoreCase(request.getCodigoProducto())) {
@@ -103,6 +105,7 @@ public class InventarioService {
         return inventarioMapper.toResponse(guardado);
     }
 
+    @Transactional
     public InventarioResponse actualizar(Long id, InventarioRequest request) {
         log.info("Actualizando inventario ID: {}", id);
         Inventario inventario = inventarioRepository.findById(id)
@@ -122,12 +125,14 @@ public class InventarioService {
         return inventarioMapper.toResponse(inventarioRepository.save(inventario));
     }
 
+    @Transactional
     public void eliminar(Long id) {
         Inventario inventario = inventarioRepository.findById(id)
                 .orElseThrow(() -> new InventarioNoEncontradoException(id));
         inventarioRepository.delete(inventario);
     }
 
+    @Transactional
     public InventarioResponse sincronizarStockProducto(String codigoProducto, String nombreProducto, Integer stockActual, Integer stockMinimo) {
         String codigoNormalizado = codigoProducto.toUpperCase().trim();
         int stockFinal = stockActual != null ? Math.max(0, stockActual) : 0;
@@ -151,11 +156,12 @@ public class InventarioService {
         return inventarioMapper.toResponse(inventarioRepository.save(inventario));
     }
 
+    @Transactional
     public MovimientoInventarioResponse registrarMovimiento(MovimientoInventarioRequest request) {
         log.info("Registrando movimiento {} de {} unidades para producto {}",
                 request.getTipoMovimiento(), request.getCantidad(), request.getCodigoProducto());
 
-        Inventario inventario = inventarioRepository.findByCodigoProductoIgnoreCase(request.getCodigoProducto().trim())
+        Inventario inventario = inventarioRepository.findForUpdateByCodigoProducto(request.getCodigoProducto().trim())
                 .orElseThrow(() -> new InventarioNoEncontradoException(
                         "No existe inventario para el código: " + request.getCodigoProducto()));
 
@@ -207,6 +213,7 @@ public class InventarioService {
         return inventarioMapper.toMovimientoResponse(movimientoRepository.save(movimiento));
     }
 
+    @Transactional
     public InventarioResponse descontarStock(String codigoProducto, Integer cantidad, String motivo) {
         MovimientoInventarioRequest movRequest = MovimientoInventarioRequest.builder()
                 .codigoProducto(codigoProducto)
@@ -218,6 +225,7 @@ public class InventarioService {
         return obtenerPorCodigoProducto(codigoProducto);
     }
 
+    @Transactional
     public InventarioResponse reponerStock(String codigoProducto, Integer cantidad, String motivo) {
         MovimientoInventarioRequest movRequest = MovimientoInventarioRequest.builder()
                 .codigoProducto(codigoProducto)
@@ -229,6 +237,7 @@ public class InventarioService {
         return obtenerPorCodigoProducto(codigoProducto);
     }
 
+    @Transactional
     public MovimientoInventarioResponse confirmarRecepcionSolicitud(Long idMovimiento) {
         MovimientoInventario mov = movimientoRepository.findById(idMovimiento)
                 .orElseThrow(() -> new InventarioNoEncontradoException(

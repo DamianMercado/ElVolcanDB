@@ -18,6 +18,7 @@ public interface InventarioMapper {
     @Mapping(target = "fechaActualizacion", ignore = true)
     @Mapping(target = "fechaActualizacionChile", ignore = true)
     @Mapping(target = "zonaHoraria", ignore = true)
+    @Mapping(target = "version", ignore = true)
     Inventario toEntity(InventarioRequest request);
 
     InventarioResponse toResponse(Inventario inventario);

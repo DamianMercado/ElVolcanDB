@@ -1,5 +1,7 @@
 package com.elvolcan.ms_venta.dto.request;
 
+import java.util.List;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,4 +25,5 @@ public class SeguimientoVentaRequest {
     private String repartidorTelefono;
     private String repartidorPatente;
     private String repartidorVehiculo;
+    private List<Map<String, Object>> alertasRuta;
 }

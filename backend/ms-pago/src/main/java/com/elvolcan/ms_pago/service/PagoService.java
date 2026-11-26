@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -68,6 +69,7 @@ public class PagoService {
         return pagoMapper.toResponseList(pagoRepository.findByIdVenta(idVenta));
     }
 
+    @Transactional
     public PagoResponse procesarPago(PagoRequest request) {
         log.info("Procesando pago para la venta ID: {}", request.getIdVenta());
 
@@ -99,6 +101,7 @@ public class PagoService {
         return pagoMapper.toResponse(guardado);
     }
 
+    @Transactional
     public PagoResponse validarPago(Long id) {
         log.info("Validando pago ID: {}", id);
         Pago pago = pagoRepository.findById(id)
@@ -131,6 +134,7 @@ public class PagoService {
         }
     }
 
+    @Transactional
     public PagoResponse reembolsarPago(Long id) {
         Pago pago = pagoRepository.findById(id)
                 .orElseThrow(() -> new PagoNoEncontradoException(id));
@@ -143,6 +147,7 @@ public class PagoService {
         return pagoMapper.toResponse(pagoRepository.save(pago));
     }
 
+    @Transactional
     public void eliminarPago(Long id) {
         Pago pago = pagoRepository.findById(id)
                 .orElseThrow(() -> new PagoNoEncontradoException(id));

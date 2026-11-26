@@ -8,6 +8,21 @@
 !.env.example
 !.env.example.*
 
+# Oracle Cloud Autonomous Database Wallet (mTLS)
+backend/wallet/
+**/wallet/
+Wallet_*.zip
+wallet_*.zip
+cwallet.sso
+ewallet.p12
+ewallet.pem
+keystore.jks
+truststore.jks
+ojdbc.properties
+sqlnet.ora
+tnsnames.ora
+backend/scripts/out/
+
 # ============================================
 # Node / Frontend
 # ============================================

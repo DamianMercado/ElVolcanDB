@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec'
+import { crearEstiloVectorialUber } from '../utils/estiloMapaWaze.js'
 import {
   obtenerEntregaActiva,
   reiniciarEntregaDemo,
@@ -9,6 +11,10 @@ import {
   ventaAEntrega,
   cargarEntregaRealDesdeBackend,
   crearEntregaTestInicial,
+  calcularDistanciaKm,
+  calcularMejorRutaEntregas,
+  guardarAlertasRutaPedido,
+  obtenerAlertasRutaPedido,
 } from '../service/repartoService.js'
 
 describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
@@ -158,5 +164,119 @@ describe('Servicio de Reparto y Trazado GPS (repartoService)', () => {
     expect(testData.codigoVenta).toBe('TEST-1024')
     expect(testData.estado).toBe('en_camino')
     expect(localStorage.getItem('el_volcan_entrega_activa')).toBeNull()
+  })
+
+  it('crearEstiloVectorialUber produce estilos MapLibre válidos en Modo Noche y Modo Día (CARTO, OpenFreeMap y Raster)', () => {
+    const tramoRecorrido = [
+      [-70.5758, -33.5975],
+      [-70.5762, -33.6012],
+    ]
+    const tramoActivo = [
+      [-70.5762, -33.6012],
+      [-70.5766, -33.6119],
+    ]
+
+    for (const proveedor of ['carto', 'openfreemap', 'raster']) {
+      const estiloNoche = crearEstiloVectorialUber(
+        true,
+        tramoRecorrido,
+        tramoActivo,
+        proveedor
+      )
+      const estiloDia = crearEstiloVectorialUber(
+        false,
+        tramoRecorrido,
+        tramoActivo,
+        proveedor
+      )
+
+      expect(validateStyleMin(estiloNoche)).toEqual([])
+      expect(validateStyleMin(estiloDia)).toEqual([])
+      expect(estiloNoche.layers.find((l) => l.id === 'fondo').paint['background-color']).toBe('#121212')
+      expect(estiloDia.layers.find((l) => l.id === 'fondo').paint['background-color']).toBe('#F6F6F6')
+    }
+
+    const estiloCarto = crearEstiloVectorialUber(true, tramoRecorrido, tramoActivo, 'carto')
+    const capaCallesEtiquetas = estiloCarto.layers.find((l) => l.id === 'etiquetas-calles')
+    expect(capaCallesEtiquetas.layout['text-keep-upright']).toBe(true)
+  })
+
+  it('calcularMejorRutaEntregas ordena los pedidos pendientes para ahorrar distancia y excluye los entregados', () => {
+    const origen = { lat: -33.5985, lng: -70.578, nombre: 'Planta' }
+    const entregas = [
+      // Pedido lejano listado primero a propósito (orden ineficiente)
+      {
+        codigoVenta: 'EV-301',
+        estado: 'pendiente',
+        total: 31990,
+        cliente: { nombre: 'Cliente Lejano', direccion: 'Sur', coordenadas: { lat: -33.635, lng: -70.575 } },
+      },
+      // Pedido más cercano al punto actual
+      {
+        codigoVenta: 'EV-302',
+        estado: 'en_camino',
+        total: 25990,
+        cliente: { nombre: 'Cliente Cercano', direccion: 'Centro', coordenadas: { lat: -33.602, lng: -70.577 } },
+      },
+      // Pedido intermedio
+      {
+        codigoVenta: 'EV-303',
+        estado: 'pendiente',
+        total: 42990,
+        cliente: { nombre: 'Cliente Medio', direccion: 'Medio', coordenadas: { lat: -33.615, lng: -70.576 } },
+      },
+      // Pedido ya entregado (debe excluirse de pendientes)
+      {
+        codigoVenta: 'EV-304',
+        estado: 'entregado',
+        total: 18990,
+        cliente: { nombre: 'Ya Entregado', direccion: 'Norte', coordenadas: { lat: -33.599, lng: -70.578 } },
+      },
+    ]
+
+    expect(calcularDistanciaKm(-33.5985, -70.578, -33.602, -70.577)).toBeGreaterThan(0)
+
+    const plan = calcularMejorRutaEntregas(entregas, origen)
+    expect(plan.paradas).toHaveLength(3)
+    expect(plan.paradas.map((p) => p.entrega.codigoVenta)).toEqual([
+      'EV-302',
+      'EV-303',
+      'EV-301',
+    ])
+    expect(plan.pedidoRecomendado.codigoVenta).toBe('EV-302')
+    expect(plan.paradas[0].esRecomendado).toBe(true)
+    expect(plan.distanciaTotalKm).toBeLessThan(plan.distanciaOriginalKm)
+    expect(plan.ahorroKm).toBeGreaterThan(0)
+  })
+
+  it('persiste y mapea alertasRuta desde MongoDB (entrega.alertas_ruta) y localStorage para el cliente', () => {
+    const alerta = {
+      id: 'alerta-1',
+      tipo: 'trafico',
+      etiqueta: 'Tráfico lento',
+      color: '#FFC043',
+      textoColor: '#121212',
+      lat: -33.605,
+      lng: -70.577,
+      horaChile: '12:15',
+    }
+
+    guardarAlertasRutaPedido('EV-110', [alerta])
+    expect(obtenerAlertasRutaPedido('EV-110')).toHaveLength(1)
+    expect(obtenerAlertasRutaPedido('EV-110')[0].etiqueta).toBe('Tráfico lento')
+
+    const entregaDesdeMongo = ventaAEntrega({
+      id: 110,
+      codigoVenta: 'EV-110',
+      cliente: 'Cliente Prueba',
+      total: 31990,
+      entrega: {
+        estado_despacho: 'en_camino',
+        alertas_ruta: [alerta],
+      },
+      items: [],
+    })
+    expect(entregaDesdeMongo.alertasRuta).toHaveLength(1)
+    expect(entregaDesdeMongo.alertasRuta[0].etiqueta).toBe('Tráfico lento')
   })
 })

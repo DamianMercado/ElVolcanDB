@@ -1,62 +1,76 @@
 package com.elvolcan.ms_pago.model;
 
 import com.elvolcan.ms_pago.enums.EstadoPago;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Document(collection = "pago")
+@Entity
+@Table(
+        name = "pago",
+        indexes = {
+                @Index(name = "idx_pago_id_venta", columnList = "id_venta"),
+                @Index(name = "idx_pago_codigo_trx", columnList = "codigo_transaccion", unique = true)
+        }
+)
 public class Pago {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Indexed
-    @Field("id_venta")
+    @Column(name = "id_venta", nullable = false)
     private Long idVenta;
 
-    @Field("monto_pago")
-    private Double montoPago;
+    @Column(name = "monto_pago", nullable = false, precision = 12, scale = 2)
+    private BigDecimal montoPago;
 
-    @Field("metodo_pago")
+    @Column(name = "metodo_pago", nullable = false, length = 60)
     private String metodoPago;
 
-    @Field("estado_pago")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_pago", nullable = false, length = 30)
     private EstadoPago estadoPago;
 
-    @Field("codigo_transaccion")
+    @Column(name = "codigo_transaccion", length = 60)
     private String codigoTransaccion;
 
-    @Field("codigo_autorizacion")
+    @Column(name = "codigo_autorizacion", length = 60)
     private String codigoAutorizacion;
 
-    @Field("tarjeta_terminacion")
+    @Column(name = "tarjeta_terminacion", length = 10)
     private String tarjetaTerminacion;
 
-    @Field("email_comprobante")
+    @Column(name = "email_comprobante", length = 150)
     private String emailComprobante;
 
-    @Field("nombre_titular")
+    @Column(name = "nombre_titular", length = 150)
     private String nombreTitular;
 
-    @Field("fecha_pago")
+    @Column(name = "fecha_pago", nullable = false)
     private LocalDateTime fechaPago;
 
-    @Field("fecha_pago_chile")
+    @Column(name = "fecha_pago_chile", length = 50)
     private String fechaPagoChile;
 
-    @Field("zona_horaria")
+    @Column(name = "zona_horaria", nullable = false, length = 50)
     @Builder.Default
     private String zonaHoraria = "America/Santiago";
 }

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @theme {
   --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -77,15 +78,15 @@
 @keyframes pulso-halo-repartidor {
   0% {
     transform: scale(0.9);
-    box-shadow: 0 0 0 0 rgba(33, 113, 236, 0.8);
+    box-shadow: 0 0 0 0 rgba(39, 110, 241, 0.8);
   }
   70% {
     transform: scale(1.08);
-    box-shadow: 0 0 0 18px rgba(33, 113, 236, 0);
+    box-shadow: 0 0 0 18px rgba(39, 110, 241, 0);
   }
   100% {
     transform: scale(0.9);
-    box-shadow: 0 0 0 0 rgba(33, 113, 236, 0);
+    box-shadow: 0 0 0 0 rgba(39, 110, 241, 0);
   }
 }
 
@@ -101,7 +102,7 @@
   height: 44px;
   border-radius: 9999px;
   background: #121212;
-  border: 3px solid #2171ec;
+  border: 3px solid #276EF1;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(18, 18, 18, 0.45);
   transition: transform 0.4s ease;
@@ -115,7 +116,7 @@
   height: 38px;
   border-radius: 9999px;
   background: #121212;
-  border: 3px solid #2171ec;
+  border: 3px solid #276EF1;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(18, 18, 18, 0.35);
 }
@@ -128,14 +129,35 @@
   height: 36px;
   border-radius: 9999px;
   background: #ffffff;
-  border: 2px solid #adadad;
-  color: #2171ec;
+  border: 2px solid #545454;
+  color: #276EF1;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
 }
 
-/* Filtro de estilo Uber para capas de mapa */
-.mapa-estilo-uber .leaflet-tile-pane {
-  filter: contrast(98%) brightness(101%);
+/* Superficies base y capas de mapa con paleta Uber (Día #F6F6F6 / Noche #121212) */
+.mapa-noche-superficie .leaflet-container {
+  background: #121212 !important;
+}
+
+.mapa-dia-superficie .leaflet-container {
+  background: #F6F6F6 !important;
+}
+
+.mapa-capa-uber-etiquetas {
+  pointer-events: none;
+}
+
+/* Estilos limpios para popups y controles de MapLibre GL (Modo Waze Repartidor) */
+.maplibregl-popup-content {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.28) !important;
+  padding: 10px 14px !important;
+  font-family: inherit !important;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px !important;
+  opacity: 0.72;
 }
 
 /* Fallback OpenStreetMap en escala de grises limpia tipo Uber */
@@ -160,5 +182,14 @@
 .leaflet-popup-content {
   margin: 10px 14px !important;
   line-height: 1.4 !important;
+}
+
+.ocultar-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.ocultar-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 

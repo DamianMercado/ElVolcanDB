@@ -85,8 +85,9 @@ if [[ ! -f "${BACKEND_DIR}/docker-compose.yml" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${BACKEND_DIR}/.env" ]]; then
-  log "ADVERTENCIA: No existe ${BACKEND_DIR}/.env. Se usarán valores por defecto (MongoDB local). Crea ${BACKEND_DIR}/.env con tu MONGO_URI de Atlas."
+if [[ ! -f "${BACKEND_DIR}/.env" && -z "${MONGO_URI:-}" ]]; then
+  log "ERROR: No existe ${BACKEND_DIR}/.env ni la variable MONGO_URI. Crea ${BACKEND_DIR}/.env con tu MONGO_URI de MongoDB Atlas."
+  exit 1
 fi
 
 # Permitir operaciones git aunque el servicio corra como root (systemd/cron) sobre un repo de ubuntu

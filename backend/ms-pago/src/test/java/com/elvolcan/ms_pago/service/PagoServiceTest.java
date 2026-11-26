@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,7 +39,7 @@ class PagoServiceTest {
 
     @Test
     void obtenerPorId_debeRetornarPago() {
-        Pago p = Pago.builder().id(1L).idVenta(1L).montoPago(36980.0).estadoPago(EstadoPago.PAGADO).build();
+        Pago p = Pago.builder().id(1L).idVenta(1L).montoPago(new BigDecimal("36980.00")).estadoPago(EstadoPago.PAGADO).build();
         PagoResponse r = PagoResponse.builder().id(1L).idVenta(1L).montoPago(36980.0).estadoPago(EstadoPago.PAGADO).build();
 
         when(pagoRepository.findById(1L)).thenReturn(Optional.of(p));

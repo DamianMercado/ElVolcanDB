@@ -6,6 +6,8 @@ import com.elvolcan.ms_venta.model.Venta;
 import com.elvolcan.ms_venta.repository.VentaRepository;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.ReplaceOptions;
+import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -150,10 +152,69 @@ public class MongoVentaConfig {
                     mongoTemplate.getCollection("venta").createIndex(
                             Indexes.geo2dsphere("entrega.ubicacion"), new IndexOptions().name("idx_venta_geo"));
                 }
+
+                inicializarColeccionesNoSqlGeo(mongoTemplate);
             } catch (Exception e) {
                 log.warn("No se pudo ejecutar la semilla inicial de ms-venta en MongoDB: {}", e.getMessage());
             }
         };
+    }
+
+    private void inicializarColeccionesNoSqlGeo(MongoTemplate mongoTemplate) {
+        if (!mongoTemplate.collectionExists("zonas_despacho") || mongoTemplate.getCollection("zonas_despacho").countDocuments() == 0) {
+            List<Document> zonas = List.of(
+                    new Document("_id", 1)
+                            .append("nombre_zona", "Zona Sur — Puente Alto")
+                            .append("comunas_descripcion", "Puente Alto (sectores centro, norte y sur)")
+                            .append("comunas", List.of("Puente Alto", "Pirque", "San José de Maipo"))
+                            .append("dias_despacho", List.of("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"))
+                            .append("horario", new Document("hora_inicio", 8).append("hora_fin", 20).append("etiqueta", "08:00 – 20:00"))
+                            .append("comision_extra_clp", 0),
+                    new Document("_id", 2)
+                            .append("nombre_zona", "Zona Oriente — La Florida")
+                            .append("comunas_descripcion", "La Florida, Macul y Peñalolén")
+                            .append("comunas", List.of("La Florida", "Macul", "Peñalolén"))
+                            .append("dias_despacho", List.of("LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"))
+                            .append("horario", new Document("hora_inicio", 8).append("hora_fin", 19).append("etiqueta", "08:00 – 19:00"))
+                            .append("comision_extra_clp", 150)
+            );
+            for (Document z : zonas) {
+                mongoTemplate.getCollection("zonas_despacho").replaceOne(
+                        new Document("_id", z.get("_id")), z, new ReplaceOptions().upsert(true));
+            }
+        }
+
+        if (!mongoTemplate.collectionExists("repartidores") || mongoTemplate.getCollection("repartidores").countDocuments() == 0) {
+            List<Document> repartidores = List.of(
+                    new Document("_id", 1)
+                            .append("rut", "33333333-3")
+                            .append("nombre", "Carlos Ruiz")
+                            .append("patente_camion", "KJ-WP-42")
+                            .append("id_zona_base", 1)
+                            .append("activo", true)
+                            .append("ubicacion_actual", new Document("type", "Point").append("coordinates", List.of(-70.5780, -33.5985))),
+                    new Document("_id", 2)
+                            .append("rut", "55555555-5")
+                            .append("nombre", "Diego Fuentes")
+                            .append("patente_camion", "LP-RT-88")
+                            .append("id_zona_base", 2)
+                            .append("activo", true)
+                            .append("ubicacion_actual", new Document("type", "Point").append("coordinates", List.of(-70.5880, -33.5420))),
+                    new Document("_id", 3)
+                            .append("rut", "66666666-6")
+                            .append("nombre", "Valentina Soto")
+                            .append("patente_camion", "BV-9281")
+                            .append("id_zona_base", 1)
+                            .append("activo", true)
+                            .append("ubicacion_actual", new Document("type", "Point").append("coordinates", List.of(-70.5750, -33.6080)))
+            );
+            for (Document r : repartidores) {
+                mongoTemplate.getCollection("repartidores").replaceOne(
+                        new Document("_id", r.get("_id")), r, new ReplaceOptions().upsert(true));
+            }
+            mongoTemplate.getCollection("repartidores").createIndex(
+                    Indexes.geo2dsphere("ubicacion_actual"), new IndexOptions().name("idx_repartidor_geo"));
+        }
     }
 
     private Venta crearVenta(

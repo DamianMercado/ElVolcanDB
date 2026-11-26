@@ -1,25 +1,27 @@
-# El Volcán — Backend de Microservicios (Spring Boot + MongoDB Atlas)
+# El Volcán — Backend de Microservicios (Persistencia Políglota: Oracle Cloud SQL + MongoDB Atlas)
 
-Sistema distribuido de venta, gestión de inventario, pagos y logística de distribución de gas licuado y accesorios **El Volcán**, construido con una **arquitectura de microservicios** sobre **Java 17**, **Spring Boot 3.4.0**, **Spring Cloud 2024.0.0**, **Spring Data MongoDB**, **MongoDB 7.0 / Atlas Cloud**, **OpenFeign**, **JJWT**, **MapStruct**, **Spring Boot Actuator**, **Swagger / OpenAPI 3** y **Docker Compose**, con zona horaria unificada en **`America/Santiago`**.
-
----
-
-## 1. Arquitectura y Responsabilidades de los Microservicios
-
-| Servicio | Puerto | Persistencia MongoDB (`el_volcan_db`) | Responsabilidad Principal |
-|---|---|---|---|
-| `eureka-server` | `8761` | — | Servidor de registro y descubrimiento de microservicios (Netflix Eureka). |
-| `gateway-service` | `8080` | — | Puerta de enlace única (Spring Cloud Gateway MVC) que enruta `/api/v1/**` y gestiona CORS centralizado. |
-| `ms-usuario` | `8081` | `usuario`, `repartidores`, `zonas_despacho` | Gestión de usuarios (`ADMIN`, `OPERADOR`, `REPARTIDOR`, `CLIENTE`), cifrado BCrypt y datos geoespaciales `2dsphere`. |
-| `ms-auth` | `8082` | `sesion_auth` | Autenticación centralizada (`login`, `registro`, `recuperar-clave`, `validar`, `logout`), emisión/revocación de tokens JWT. |
-| `ms-inventario` | `8083` | `inventario`, `movimiento_inventario` | Control de stock actual/mínimo y registro de movimientos (`ENTRADA`, `SALIDA`, `AJUSTE`, `SOLICITUD_REPOSICION`). |
-| `ms-catalogo` | `8084` | `producto_catalogo`, `productos` | Catálogo de productos e imágenes `.webp`, enriquecido con stock en tiempo real desde `ms-inventario` vía OpenFeign. |
-| `ms-venta` | `8085` | `venta` | Creación de pedidos, descuento/reposición de stock, asignación de repartidores, auditoría y **seguimiento GPS en vivo** (`PUT /api/v1/ventas/{id}/seguimiento`). |
-| `ms-pago` | `8086` | `pago` | Procesamiento, validación y reembolso de pagos Webpay asociados a las ventas, notificando a `ms-venta` vía OpenFeign. |
+Sistema distribuido de venta, gestión de inventario, pagos y logística de distribución de gas licuado y accesorios **El Volcán**, construido con una **arquitectura de microservicios con persistencia políglota** sobre **Java 17**, **Spring Boot 3.4.0**, **Spring Cloud 2024.0.0**, **Oracle Cloud Autonomous Database (26ai, Spring Data JPA + Flyway + mTLS Wallet)**, **MongoDB Atlas (Spring Data MongoDB)**, **OpenFeign**, **JJWT**, **MapStruct**, **Spring Boot Actuator**, **Swagger / OpenAPI 3** y **Docker Compose**, con zona horaria unificada en **`America/Santiago`**.
 
 ---
 
-## 2. Diagrama de Arquitectura
+## 1. Arquitectura Políglota y Responsabilidades de los Microservicios
+
+Cada microservicio posee su propio motor de persistencia según la naturaleza de sus datos (patrón *Database-per-Service* + *Polyglot Persistence*):
+
+| Servicio | Puerto | Motor de Datos | Esquema / Colecciones | Responsabilidad Principal |
+|---|---|---|---|---|
+| `eureka-server` | `8761` | — | — | Servidor de registro y descubrimiento de microservicios (Netflix Eureka). |
+| `gateway-service` | `8080` | — | — | Puerta de enlace única (Spring Cloud Gateway MVC) que enruta `/api/v1/**` y gestiona CORS centralizado. |
+| `ms-usuario` | `8081` | **Oracle SQL** (`ELVOLCAN_USUARIO`) | `USUARIO` (Flyway `V1`) | Gestión de usuarios (`ADMIN`, `OPERADOR`, `REPARTIDOR`, `CLIENTE`), unicidad estricta de email/RUT y cifrado BCrypt. |
+| `ms-inventario` | `8083` | **Oracle SQL** (`ELVOLCAN_INVENTARIO`) | `INVENTARIO`, `MOVIMIENTO_INVENTARIO` (FK + `@Version` + bloqueo pesimista) | Control ACID de stock actual/mínimo y trazabilidad transaccional de movimientos (`ENTRADA`, `SALIDA`, `AJUSTE`, `SOLICITUD_REPOSICION`). |
+| `ms-pago` | `8086` | **Oracle SQL** (`ELVOLCAN_PAGO`) | `PAGO` (`NUMBER(12,2)` / `BigDecimal`) | Procesamiento, validación y reembolso ACID de pagos Webpay asociados a las ventas, notificando a `ms-venta` vía OpenFeign. |
+| `ms-auth` | `8082` | **MongoDB Atlas** (`el_volcan_db`) | `sesion_auth` (índice TTL en `fecha_expiracion`) | Autenticación centralizada (`login`, `registro`, `recuperar-clave`, `validar`, `logout`), emisión/revocación de tokens JWT con expiración automática. |
+| `ms-catalogo` | `8084` | **MongoDB Atlas** (`el_volcan_db`) | `producto_catalogo`, `productos` | Catálogo flexible de productos e imágenes `.webp`, enriquecido con stock en tiempo real desde `ms-inventario` vía OpenFeign. |
+| `ms-venta` | `8085` | **MongoDB Atlas** (`el_volcan_db`) | `venta`, `zonas_despacho`, `repartidores` (`2dsphere`) | Pedidos con líneas embebidas, auditoría, alertas en ruta y **seguimiento GPS en vivo** (`PUT /api/v1/ventas/{id}/seguimiento`). |
+
+---
+
+## 2. Diagrama de Arquitectura Políglota
 
 ```mermaid
 flowchart TB
@@ -28,42 +30,55 @@ flowchart TB
     Frontend --> GW["API Gateway<br/>:8080"]
     GW <--> EUR["Eureka Server<br/>:8761"]
 
-    GW --> AUTH["ms-auth :8082"]
     GW --> USU["ms-usuario :8081"]
     GW --> INV["ms-inventario :8083"]
+    GW --> PAG["ms-pago :8086"]
+    GW --> AUTH["ms-auth :8082"]
     GW --> CAT["ms-catalogo :8084"]
     GW --> VEN["ms-venta :8085"]
-    GW --> PAG["ms-pago :8086"]
 
     AUTH -. OpenFeign .-> USU
-    USU -. OpenFeign (Auth) .-> AUTH
-    INV -. OpenFeign (Auth) .-> AUTH
-    CAT -. OpenFeign (Auth) .-> AUTH
     CAT -. OpenFeign (Stock) .-> INV
-    VEN -. OpenFeign (Auth) .-> AUTH
-    VEN -. OpenFeign (Producto) .-> CAT
-    VEN -. OpenFeign (Stock) .-> INV
-    PAG -. OpenFeign (Auth) .-> AUTH
+    VEN -. OpenFeign (Producto / Stock) .-> CAT & INV
     PAG -. OpenFeign (Confirmar Pago) .-> VEN
 
-    USU & AUTH & INV & CAT & VEN & PAG --> MONGO[("MongoDB 7.0 / Atlas Cloud<br/>el_volcan_db (TZ America/Santiago)")]
+    USU --> ORA_U[("Oracle Cloud ADB<br/>ELVOLCAN_USUARIO")]
+    INV --> ORA_I[("Oracle Cloud ADB<br/>ELVOLCAN_INVENTARIO")]
+    PAG --> ORA_P[("Oracle Cloud ADB<br/>ELVOLCAN_PAGO")]
+
+    AUTH & CAT & VEN --> MONGO[("MongoDB Atlas<br/>el_volcan_db (TZ America/Santiago)")]
 ```
 
 ---
 
-## 3. Zona Horaria y Timestamps (`America/Santiago`)
+## 3. Configuración de Oracle Cloud Autonomous Database (mTLS Wallet)
 
-Todos los contenedores Alpine instalan `tzdata`, establecen `TZ=America/Santiago` y ejecutan la JVM con `-Duser.timezone=America/Santiago`. Además:
-* Cada microservicio registra conversores explícitos de Spring Data MongoDB (`LocalDateTime <-> Date`) fijados a `ZoneId.of("America/Santiago")`.
-* Cada documento con marcas de tiempo (`venta`, `pago`, `sesion_auth`, `inventario`, `movimiento_inventario`) almacena tanto la fecha BSON como su representación legible ISO-8601 con offset chileno (`fecha_*_chile`, ej. `2026-11-20T00:15:00-03:00`) y `zona_horaria: "America/Santiago"`.
+1. Crea una instancia **Autonomous Database (Transaction Processing, Always Free)** en Oracle Cloud Infrastructure (OCI).
+2. Ejecuta [oracle-init-schemas.sql](scripts/oracle-init-schemas.sql) conectado como `ADMIN` en **Database Actions (SQL Developer Web)** reemplazando los placeholders de contraseña para crear los tres esquemas (`ELVOLCAN_USUARIO`, `ELVOLCAN_INVENTARIO`, `ELVOLCAN_PAGO`).
+3. Descarga la **Instance Wallet** desde OCI y descomprime su contenido dentro de `backend/wallet/` (protegida por `.gitignore` para no subir nunca certificados ni claves al repositorio).
+4. Configura `backend/.env` a partir de `backend/.env.example` indicando `ORACLE_TNS_ALIAS` (ej. `elvolcandb_tp`) y las credenciales de cada esquema junto con `MONGO_URI`.
+5. Al iniciar Docker Compose, la Wallet se monta en modo solo lectura (`/app/wallet:ro`), **Flyway** aplica automáticamente las migraciones `V1__init_*.sql` y los inicializadores cargan los datos semilla de manera idempotente.
+6. *(Opcional)* Si deseas importar datos existentes de MongoDB Atlas hacia Oracle SQL, ejecuta:
+   ```bash
+   node backend/scripts/migrar-atlas-a-oracle.mjs
+   ```
 
 ---
 
-## 4. Cómo levantar el proyecto con Docker Compose
+## 4. Zona Horaria y Timestamps (`America/Santiago`)
+
+Todos los contenedores Alpine instalan `tzdata`, establecen `TZ=America/Santiago` y ejecutan la JVM con `-Duser.timezone=America/Santiago`:
+* Los microservicios **Oracle SQL** configuran `spring.jpa.properties.hibernate.jdbc.time_zone=America/Santiago` y pools HikariCP acotados (`ORACLE_POOL_MAX=4` por servicio) para respetar los límites de sesiones concurrentes de Oracle Always Free.
+* Los microservicios **MongoDB Atlas** registran conversores explícitos (`LocalDateTime <-> Date`) en `America/Santiago`, con índice TTL automático en `sesion_auth.fecha_expiracion` e índices geoespaciales `2dsphere` en `venta` y `repartidores`.
+
+---
+
+## 5. Cómo levantar el proyecto con Docker Compose
 
 ```bash
 cd backend
-cp .env.example .env   # Configura MONGO_URI con tu cluster de MongoDB Atlas
+cp .env.example .env   # Configura MONGO_URI y credenciales ORACLE_*
+# Descomprime la Wallet OCI en backend/wallet/
 docker compose up --build -d
 ```
 
@@ -79,25 +94,23 @@ docker compose up --build -d
 
 ---
 
-## 5. Automatización en AWS EC2 (Auto-arranque + Auto-update 03:00 AM Chile + IP Pública Dinámica)
+## 6. Automatización en AWS EC2 (Auto-arranque + Auto-update 03:00 AM Chile + IP Pública Dinámica)
 
-En `backend/scripts/` se incluyen tres scripts para operar sin intervención manual en AWS EC2 (Ubuntu 22.04/24.04):
-
-* **`backend/scripts/ec2-userdata-setup.sh`**:
-  * Se puede pegar en **User Data** al crear la instancia EC2 o ejecutar una sola vez con `sudo bash backend/scripts/ec2-userdata-setup.sh`.
-  * Configura `America/Santiago`, crea SWAP de 4 GB, instala Docker + Compose, habilita el servicio `systemd` (`elvolcan-docker.service`) para iniciar automáticamente los contenedores en cada arranque de EC2 y programa la actualización diaria vía Cron a las **03:00 AM hora de Santiago de Chile**.
-* **`backend/scripts/ec2-autodeploy.sh`**:
-  * Detecta automáticamente si existen nuevos commits en `origin/main` de GitHub. Si hay cambios, actualiza el clon (preservando `backend/.env`), reconstruye y levanta los contenedores con `docker compose up --build -d --remove-orphans`, limpia imágenes huérfanas, dispara la sincronización de IP pública y registra todo en `/var/log/elvolcan-autodeploy.log`.
-* **`backend/scripts/ec2-sync-ip.sh`**:
-  * Al iniciar la instancia EC2 (ideal para AWS Academy donde cambia la IP pública al reiniciar el laboratorio), detecta la nueva IPv4 pública vía **EC2 IMDSv2** (`169.254.169.254`) y actualiza automáticamente `VITE_API_URL` en Render + dispara el deploy del frontend (usando `RENDER_API_KEY` y `RENDER_SERVICE_ID` en `backend/.env`, sin tocar `VITE_CARTO_API_KEY`), y/o actualiza DuckDNS (`DUCKDNS_DOMAIN` + `DUCKDNS_TOKEN`).
+En `backend/scripts/` se incluyen scripts para operar en AWS EC2 (Ubuntu 22.04/24.04):
+* **`backend/scripts/ec2-userdata-setup.sh`**: Configura `America/Santiago`, SWAP de 4 GB, Docker + Compose, servicio `systemd` y cron diario a las **03:00 AM Chile**.
+* **`backend/scripts/ec2-autodeploy.sh`**: Detecta nuevos commits en `origin/main`, actualiza el clon (preservando `backend/.env` y `backend/wallet/`) y reconstruye contenedores.
+* **`backend/scripts/ec2-sync-ip.sh`**: Detecta la IPv4 pública vía IMDSv2 y actualiza automáticamente `VITE_API_URL` en Render y/o DuckDNS.
 
 ---
 
-## 6. Pruebas Unitarias por Microservicio
+## 7. Pruebas Unitarias e Integración JPA/Flyway
 
-Cada microservicio incluye Maven Wrapper completo (`mvnw` / `mvnw.cmd`):
+Cada microservicio incluye Maven Wrapper completo (`mvnw` / `mvnw.cmd`). Los servicios Oracle SQL incluyen pruebas `@DataJpaTest` con H2 en modo `MODE=Oracle` ejecutando las migraciones Flyway reales:
 
 ```bash
+cd backend/ms-pago && ./mvnw test
+cd backend/ms-inventario && ./mvnw test
+cd backend/ms-usuario && ./mvnw test
 cd backend/ms-auth && ./mvnw test
 cd backend/ms-venta && ./mvnw test
 ```

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ListarProductos } from '../service/productoService.js'
 import { useCarrito } from '../context/Carrito.jsx'
 import { TarjetaProducto } from '../components/productos/TarjetaProducto.jsx'
@@ -11,10 +12,19 @@ import {
 
 export function Productos() {
   const { agregarAlCarrito } = useCarrito()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const categoriaActiva = searchParams.get('categoria') || 'todos'
   const [listaProductos, setListaProductos] = useState([])
   const [cargando, setCargando] = useState(true)
-  const [categoriaActiva, setCategoriaActiva] = useState('todos')
   const [avisoError, setAvisoError] = useState('')
+
+  const cambiarCategoria = (nuevaCategoria) => {
+    if (String(nuevaCategoria).toLowerCase() === 'todos') {
+      setSearchParams({}, { replace: true })
+    } else {
+      setSearchParams({ categoria: nuevaCategoria }, { replace: true })
+    }
+  }
 
   useEffect(() => {
     let montado = true
@@ -54,22 +64,22 @@ export function Productos() {
         )
 
   return (
-    <main className="min-h-[calc(100vh-140px)] bg-gradient-to-b from-[#0A2540] to-[#113a63] px-5 py-10">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-8 text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">
-            Nuestros Productos
-          </h2>
-          <p className="mt-2 text-base text-white/75">
-            Selecciona los cilindros y accesorios que necesitas
-          </p>
-        </div>
+    <section className="min-h-[calc(100vh-140px)] w-full bg-gradient-to-b from-[#0A2540] via-[#0F3154] to-[#113a63] pb-12">
+      <div className="mx-auto max-w-6xl px-5 pt-10 pb-8 text-center">
+        <h2 className="text-3xl font-extrabold tracking-tight text-white md:text-4xl">
+          Nuestros Productos
+        </h2>
+        <p className="mt-2 text-base text-white/75">
+          Selecciona los cilindros y accesorios que necesitas
+        </p>
+      </div>
 
-        <FiltroCategorias
-          categoriaActiva={categoriaActiva}
-          alCambiarCategoria={setCategoriaActiva}
-        />
+      <FiltroCategorias
+        categoriaActiva={categoriaActiva}
+        alCambiarCategoria={cambiarCategoria}
+      />
 
+      <div className="mx-auto max-w-6xl px-5 pt-8">
         <BannerAlerta
           mensaje={avisoError}
           tipo="error"
@@ -90,7 +100,7 @@ export function Productos() {
           </div>
         )}
       </div>
-    </main>
+    </section>
   )
 }
 

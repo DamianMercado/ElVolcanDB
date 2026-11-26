@@ -1,14 +1,20 @@
 package com.elvolcan.ms_inventario.model;
 
 import com.elvolcan.ms_inventario.enums.EstadoStock;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
@@ -16,38 +22,47 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Document(collection = "inventario")
+@Entity
+@Table(
+        name = "inventario",
+        uniqueConstraints = @UniqueConstraint(name = "uk_inventario_codigo", columnNames = "codigo_producto")
+)
 public class Inventario {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Indexed(unique = true)
-    @Field("codigo_producto")
+    @Column(name = "codigo_producto", nullable = false, length = 40, unique = true)
     private String codigoProducto;
 
-    @Field("nombre_producto")
+    @Column(name = "nombre_producto", nullable = false, length = 200)
     private String nombreProducto;
 
-    @Field("stock_actual")
+    @Column(name = "stock_actual", nullable = false)
     private Integer stockActual;
 
-    @Field("stock_minimo")
+    @Column(name = "stock_minimo", nullable = false)
     private Integer stockMinimo;
 
-    @Field("ubicacion_bodega")
+    @Column(name = "ubicacion_bodega", length = 150)
     private String ubicacionBodega;
 
-    @Field("estado_stock")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_stock", nullable = false, length = 30)
     private EstadoStock estadoStock;
 
-    @Field("fecha_actualizacion")
+    @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
-    @Field("fecha_actualizacion_chile")
+    @Column(name = "fecha_actualizacion_chile", length = 50)
     private String fechaActualizacionChile;
 
-    @Field("zona_horaria")
+    @Column(name = "zona_horaria", nullable = false, length = 50)
     @Builder.Default
     private String zonaHoraria = "America/Santiago";
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 }

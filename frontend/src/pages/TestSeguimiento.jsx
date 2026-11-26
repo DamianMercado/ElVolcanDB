@@ -229,7 +229,7 @@ export function TestSeguimiento() {
                   Test de Seguimiento
                 </span>
                 <span className="text-xs font-semibold text-amber-800">
-                  Entorno de simulación local (no modifica pedidos reales en MongoDB)
+                  Entorno de simulación local (no modifica pedidos reales)
                 </span>
               </div>
               <p className="mt-1 text-xs text-amber-900/80">
@@ -460,11 +460,25 @@ export function TestSeguimiento() {
                 Repartidor Simulado
               </span>
               <div className="mt-3 flex items-center gap-3">
-                <img
-                  src={entrega.repartidor.foto}
-                  alt={entrega.repartidor.nombre}
-                  className="h-14 w-14 rounded-full border-2 border-[#00A8E8] object-cover shadow"
-                />
+                <div
+                  role="img"
+                  aria-label={entrega.repartidor.nombre || 'Repartidor simulado'}
+                  className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#16426E] via-[#0A2540] to-[#06182B] text-white shadow-md"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-7 w-7"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="8.5" r="3.5" stroke="#00A8E8" fill="rgba(0, 168, 232, 0.16)" />
+                    <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+                  </svg>
+                </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
                     {entrega.repartidor.nombre}

@@ -1,27 +1,8 @@
 services:
-  # ==================== MONGODB (RESPALDO LOCAL / ATLAS CLOUD) ====================
-  # Si defines MONGO_URI=mongodb+srv://... en backend/.env, todos los microservicios
-  # se conectarán directamente a tu cluster de MongoDB Atlas.
-
-  mongodb:
-    image: mongo:7.0
-    container_name: elvolcan-mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      TZ: ${TZ:-America/Santiago}
-      MONGO_INITDB_DATABASE: ${MONGO_DB:-el_volcan_db}
-    volumes:
-      - mongodb_data:/data/db
-      - ./mongodb/volcan_mongodb_setup.js:/docker-entrypoint-initdb.d/volcan_mongodb_setup.js:ro
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - elvolcan-net
-    restart: unless-stopped
+  # ==================== PERSISTENCIA POLÍGLOTA (ORACLE CLOUD + MONGODB ATLAS) ====================
+  # - Oracle Cloud Autonomous Database (mTLS Wallet): ms-usuario, ms-inventario, ms-pago
+  # - MongoDB Atlas Cloud: ms-auth, ms-catalogo, ms-venta
+  # Variables configuradas en backend/.env (wallet montada solo lectura en /app/wallet).
 
   # ==================== EUREKA SERVER ====================
 
@@ -72,7 +53,7 @@ services:
       - elvolcan-net
     restart: unless-stopped
 
-  # ==================== MICROSERVICIOS (SPRING DATA MONGODB ATLAS) ====================
+  # ==================== MICROSERVICIOS (ORACLE CLOUD SQL + MONGODB ATLAS) ====================
 
   ms-usuario:
     build:
@@ -85,12 +66,14 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
-      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - ORACLE_URL=jdbc:oracle:thin:@${ORACLE_TNS_ALIAS:?Debes definir ORACLE_TNS_ALIAS en backend/.env}?TNS_ADMIN=/app/wallet
+      - ORACLE_USER=${ORACLE_USUARIO_USER:-ELVOLCAN_USUARIO}
+      - ORACLE_PASSWORD=${ORACLE_USUARIO_PASSWORD:?Debes definir ORACLE_USUARIO_PASSWORD en backend/.env}
+      - ORACLE_WALLET_DIR=/app/wallet
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
+    volumes:
+      - ${ORACLE_WALLET_HOST_DIR:-./wallet}:/app/wallet:ro
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
     networks:
@@ -108,13 +91,11 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_URI=${MONGO_URI:?Debes definir MONGO_URI de MongoDB Atlas en backend/.env}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-86400000}
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
       ms-usuario:
@@ -134,12 +115,14 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
-      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - ORACLE_URL=jdbc:oracle:thin:@${ORACLE_TNS_ALIAS:?Debes definir ORACLE_TNS_ALIAS en backend/.env}?TNS_ADMIN=/app/wallet
+      - ORACLE_USER=${ORACLE_INVENTARIO_USER:-ELVOLCAN_INVENTARIO}
+      - ORACLE_PASSWORD=${ORACLE_INVENTARIO_PASSWORD:?Debes definir ORACLE_INVENTARIO_PASSWORD en backend/.env}
+      - ORACLE_WALLET_DIR=/app/wallet
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
+    volumes:
+      - ${ORACLE_WALLET_HOST_DIR:-./wallet}:/app/wallet:ro
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
       ms-auth:
@@ -159,12 +142,10 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_URI=${MONGO_URI:?Debes definir MONGO_URI de MongoDB Atlas en backend/.env}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
       ms-auth:
@@ -186,12 +167,10 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
+      - MONGO_URI=${MONGO_URI:?Debes definir MONGO_URI de MongoDB Atlas en backend/.env}
       - MONGO_DB=${MONGO_DB:-el_volcan_db}
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
       ms-auth:
@@ -215,12 +194,14 @@ services:
       - TZ=${TZ:-America/Santiago}
       - SPRING_PROFILES_ACTIVE=docker
       - EUREKA_URL=${EUREKA_URL:-http://eureka-server:8761/eureka/}
-      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/el_volcan_db}
-      - MONGO_DB=${MONGO_DB:-el_volcan_db}
+      - ORACLE_URL=jdbc:oracle:thin:@${ORACLE_TNS_ALIAS:?Debes definir ORACLE_TNS_ALIAS en backend/.env}?TNS_ADMIN=/app/wallet
+      - ORACLE_USER=${ORACLE_PAGO_USER:-ELVOLCAN_PAGO}
+      - ORACLE_PASSWORD=${ORACLE_PAGO_PASSWORD:?Debes definir ORACLE_PAGO_PASSWORD en backend/.env}
+      - ORACLE_WALLET_DIR=/app/wallet
       - JWT_SECRET=${JWT_SECRET:-ElVolcanSecretKeyParaAutenticacionMicroserviciosJWT2026Segura123456}
+    volumes:
+      - ${ORACLE_WALLET_HOST_DIR:-./wallet}:/app/wallet:ro
     depends_on:
-      mongodb:
-        condition: service_healthy
       eureka-server:
         condition: service_started
       ms-auth:
@@ -234,6 +215,3 @@ services:
 networks:
   elvolcan-net:
     driver: bridge
-
-volumes:
-  mongodb_data:

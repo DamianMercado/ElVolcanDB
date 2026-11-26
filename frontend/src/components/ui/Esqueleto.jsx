@@ -40,18 +40,24 @@ export function BloqueEsqueleto({ className = '', variante = 'claro' }) {
   )
 }
 
-export function EsqueletoTarjetaProducto() {
+export function EsqueletoTarjetaProducto({ className = '' }) {
   return (
     <div
-      className="flex h-full w-full flex-col rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+      className={`flex h-full w-full flex-col rounded-2xl bg-gradient-to-b from-[#1C4773] via-[#133459] to-[#0B223C] p-4 shadow-[0_14px_30px_-8px_rgba(3,12,24,0.65)] ${className}`}
       aria-hidden="true"
     >
-      <BloqueEsqueleto className="mb-3 h-44 w-full rounded-lg" />
-      <BloqueEsqueleto className="mb-2 h-4 w-1/3 rounded" />
-      <BloqueEsqueleto className="mb-1.5 h-5 w-4/5" />
-      <BloqueEsqueleto className="mt-1.5 h-7 w-2/5" />
-      <BloqueEsqueleto className="mt-2 mb-4 h-3.5 w-1/2" />
-      <BloqueEsqueleto className="mt-auto h-10 w-full rounded-lg" />
+      <BloqueEsqueleto
+        variante="oscuro"
+        className="mb-3.5 h-44 w-full rounded-xl"
+      />
+      <BloqueEsqueleto variante="oscuro" className="mb-2 h-4 w-1/3 rounded" />
+      <BloqueEsqueleto variante="oscuro" className="mb-1.5 h-5 w-4/5" />
+      <BloqueEsqueleto variante="oscuro" className="mt-1.5 h-7 w-2/5" />
+      <BloqueEsqueleto variante="oscuro" className="mt-2 mb-4 h-3.5 w-1/2" />
+      <BloqueEsqueleto
+        variante="oscuro"
+        className="mt-auto h-10 w-full rounded-xl"
+      />
     </div>
   )
 }

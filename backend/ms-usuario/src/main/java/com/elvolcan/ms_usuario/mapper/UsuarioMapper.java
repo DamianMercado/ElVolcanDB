@@ -12,6 +12,12 @@ import java.util.List;
 public interface UsuarioMapper {
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "tipoCliente", ignore = true)
+    @Mapping(target = "idZona", ignore = true)
+    @Mapping(target = "patenteCamion", ignore = true)
+    @Mapping(target = "latActual", ignore = true)
+    @Mapping(target = "lngActual", ignore = true)
+    @Mapping(target = "activo", ignore = true)
     Usuario toEntity(UsuarioRequest usuarioRequest);
 
     UsuarioResponse toResponse(Usuario usuario);

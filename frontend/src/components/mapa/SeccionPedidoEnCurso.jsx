@@ -40,10 +40,10 @@ export function SeccionPedidoEnCurso({
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black ${
                   esEntregado
-                    ? 'bg-emerald-100 text-emerald-800'
+                    ? 'bg-[#D9F2E4] text-[#048848]'
                     : esLlegando
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-[#2171ec]/15 text-[#2171ec]'
+                    ? 'bg-[#FFC043]/25 text-[#121212]'
+                    : 'bg-[#276EF1]/15 text-[#276EF1]'
                 }`}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
@@ -54,7 +54,7 @@ export function SeccionPedidoEnCurso({
             <p className="truncate text-sm font-bold text-[#121212] md:text-base">
               {entrega.cliente.nombre}
             </p>
-            <p className="truncate text-xs text-[#adadad]">
+            <p className="truncate text-xs text-[#545454]">
               {entrega.cliente.direccion}
             </p>
           </div>
@@ -63,7 +63,7 @@ export function SeccionPedidoEnCurso({
             <span className="text-base font-black text-[#121212] md:text-lg">
               ${entrega.total.toLocaleString('es-CL')}
             </span>
-            <div className="text-[11px] font-bold text-[#2171ec]">
+            <div className="text-[11px] font-bold text-[#276EF1]">
               {esEntregado ? 'Completado' : `~${entrega.etaMinutos || 8} min (${entrega.distanciaKm || 2.1} km)`}
             </div>
           </div>
@@ -76,10 +76,10 @@ export function SeccionPedidoEnCurso({
             type="button"
             onClick={alToggleSimulacion}
             disabled={gpsActivo}
-            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-white shadow transition active:scale-95 disabled:opacity-50 ${
+            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold shadow transition active:scale-95 disabled:opacity-50 ${
               simulando
-                ? 'bg-amber-500 hover:bg-amber-600'
-                : 'bg-[#2171ec] hover:bg-[#1a5ec4]'
+                ? 'bg-[#FFC043] text-[#121212] hover:bg-[#ED6E33] hover:text-white'
+                : 'bg-[#276EF1] text-white hover:bg-[#4788FF]'
             }`}
           >
             {simulando ? (
@@ -117,8 +117,8 @@ export function SeccionPedidoEnCurso({
               onClick={esLlegando ? alConfirmarEntrega : alAvisarLlegada}
               className={`cursor-pointer rounded-xl px-3 py-2 text-xs font-bold text-white shadow transition active:scale-95 ${
                 esLlegando
-                  ? 'bg-emerald-600 hover:bg-emerald-700'
-                  : 'bg-[#121212] hover:bg-[#252525]'
+                  ? 'bg-[#048848] hover:bg-[#3AA76D]'
+                  : 'bg-[#121212] hover:bg-[#242629]'
               }`}
             >
               {esLlegando ? '✓ Entregar' : '🔔 Llegué'}

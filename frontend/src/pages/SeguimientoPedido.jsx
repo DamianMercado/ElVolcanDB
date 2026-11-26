@@ -6,6 +6,7 @@ import { useSesion } from '../context/Sesion.jsx'
 import {
   cargarEntregaRealDesdeBackend,
   suscribirCambiosEntrega,
+  suscribirAlertasRuta,
 } from '../service/repartoService.js'
 import { obtenerPedidosPorUsuario } from '../service/pedidoService.js'
 import { formatearHoraChile, formatearFechaHoraChile } from '../utils/formato.js'
@@ -137,6 +138,16 @@ export function SeguimientoPedido() {
     })
     return () => desuscribir()
   }, [entrega?.ventaId, entrega?.codigoVenta])
+
+  // 3b. Escuchar alertas de ruta reportadas por el repartidor en modo solo lectura
+  useEffect(() => {
+    if (!entrega?.codigoVenta) return undefined
+    return suscribirAlertasRuta(entrega.codigoVenta, (nuevasAlertas) => {
+      setEntrega((prev) =>
+        prev ? { ...prev, alertasRuta: nuevasAlertas } : prev
+      )
+    })
+  }, [entrega?.codigoVenta])
 
   // 4. Polling en vivo contra ms-venta cada 15 segundos solo cuando hay pedido real
   useEffect(() => {
@@ -304,9 +315,6 @@ export function SeguimientoPedido() {
                     </span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
                       Pedido #{entrega.codigoVenta}
-                    </span>
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                      Sincronizado con MongoDB
                     </span>
                   </div>
                   <h1 className="mt-1 text-2xl font-black text-[#0A2540] md:text-3xl">
@@ -542,11 +550,25 @@ export function SeguimientoPedido() {
                     Repartidor Asignado
                   </span>
                   <div className="mt-3 flex items-center gap-3">
-                    <img
-                      src={entrega.repartidor?.foto}
-                      alt={entrega.repartidor?.nombre}
-                      className="h-14 w-14 rounded-full border-2 border-[#00A8E8] object-cover shadow"
-                    />
+                    <div
+                      role="img"
+                      aria-label={entrega.repartidor?.nombre || 'Repartidor asignado'}
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#16426E] via-[#0A2540] to-[#06182B] text-white shadow-md"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-7 w-7"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="8.5" r="3.5" stroke="#00A8E8" fill="rgba(0, 168, 232, 0.16)" />
+                        <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+                      </svg>
+                    </div>
                     <div>
                       <h3 className="text-base font-bold text-slate-900">
                         {entrega.repartidor?.nombre || 'Por asignar'}
@@ -600,6 +622,49 @@ export function SeguimientoPedido() {
                     <span>Llamar al Repartidor</span>
                   </a>
                 </div>
+
+                {Array.isArray(entrega.alertasRuta) &&
+                  entrega.alertasRuta.length > 0 && (
+                    <div
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                      aria-label="Avisos en ruta del repartidor"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-slate-900">
+                          Avisos en ruta del repartidor
+                        </h3>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 uppercase">
+                          Solo lectura
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Reportes en vivo del estado del tránsito durante tu entrega.
+                      </p>
+                      <ul className="mt-3 space-y-2 text-xs">
+                        {entrega.alertasRuta.map((alerta) => (
+                          <li
+                            key={alerta.id}
+                            className="flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: alerta.color }}
+                              />
+                              <span className="truncate font-bold text-slate-800">
+                                {alerta.etiqueta}
+                              </span>
+                            </div>
+                            {alerta.horaChile && (
+                              <span className="shrink-0 font-mono text-[10px] font-semibold text-slate-500">
+                                {alerta.horaChile}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h3 className="text-sm font-bold text-slate-900">

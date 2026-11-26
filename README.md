@@ -1,6 +1,6 @@
 # 🌋 El Volcán — Sistema de Venta y Distribución de Gas Licuado
 
-Plataforma integral de comercio electrónico, gestión de inventario y logística de distribución con seguimiento GPS en vivo para **El Volcán**. Construida bajo una **arquitectura distribuida de microservicios** con **Java 17 / Spring Boot 3.4**, **Spring Cloud 2024**, **MongoDB 7.0 / Atlas Cloud**, **Docker Compose** y un **Frontend SPA en React 19**, con zona horaria oficial unificada en **`America/Santiago`**.
+Plataforma integral de comercio electrónico, gestión de inventario y logística de distribución con seguimiento GPS en vivo para **El Volcán**. Construida bajo una **arquitectura distribuida de microservicios con persistencia políglota** combinando **Oracle Cloud Autonomous Database (SQL / JPA / Flyway)** y **MongoDB Atlas (NoSQL / GeoJSON / TTL)** sobre **Java 17 / Spring Boot 3.4**, **Spring Cloud 2024**, **Docker Compose** y un **Frontend SPA en React 19**, con zona horaria oficial unificada en **`America/Santiago`**.
 
 ---
 
@@ -9,48 +9,54 @@ Plataforma integral de comercio electrónico, gestión de inventario y logístic
 ```mermaid
 flowchart TB
     subgraph Frontend_Layer ["Frontend (React 19 + Vite 8 + Tailwind CSS 4)"]
-        SPA["Cliente Web SPA (Render Static Site / Nginx)<br/>• Catálogo & Carrito<br/>• Seguimiento GPS en Vivo (Leaflet + CartoDB)<br/>• Consola Repartidor & Panel Admin"]
+        SPA["Cliente Web SPA (Render Static Site / Nginx)<br/>• Catálogo & Carrito<br/>• Seguimiento Cliente (Leaflet) y Consola Repartidor 3D (MapLibre GL)<br/>• Planificador de Rutas Óptimas & Panel Admin"]
     end
 
-    subgraph Gateway_Discovery ["Enrutamiento y Descubrimiento (AWS EC2)"]
+    subgraph Gateway_Discovery ["Enrutamiento y Descubrimiento (AWS EC2 / Local)"]
         GW["Spring Cloud Gateway MVC<br/>:8080"]
         EUR["Eureka Service Registry<br/>:8761"]
     end
 
-    subgraph Microservices ["Microservicios Backend (Spring Boot 3.4)"]
-        AUTH["ms-auth :8082<br/>Sesiones & JWT"]
+    subgraph SQL_Services ["Microservicios Transaccionales (Oracle SQL + Flyway)"]
         USU["ms-usuario :8081<br/>Usuarios, BCrypt & Roles"]
-        INV["ms-inventario :8083<br/>Stock & Movimientos"]
-        CAT["ms-catalogo :8084<br/>Catálogo de Productos"]
-        VEN["ms-venta :8085<br/>Pedidos, Auditoría & Seguimiento GPS"]
-        PAG["ms-pago :8086<br/>Pasarela Webpay & Reembolsos"]
+        INV["ms-inventario :8083<br/>Stock ACID & Movimientos"]
+        PAG["ms-pago :8086<br/>Pasarela Webpay (BigDecimal)"]
     end
 
-    subgraph Data_Layer ["Capa de Persistencia NoSQL"]
-        MONGO[("MongoDB 7.0 / Atlas Cloud<br/>el_volcan_db · TZ America/Santiago")]
+    subgraph NoSQL_Services ["Microservicios Documentales (MongoDB Atlas)"]
+        AUTH["ms-auth :8082<br/>Sesiones JWT (TTL)"]
+        CAT["ms-catalogo :8084<br/>Catálogo de Productos"]
+        VEN["ms-venta :8085<br/>Pedidos, Alertas & GPS 2dsphere"]
+    end
+
+    subgraph Data_Layer ["Capa de Persistencia Políglota"]
+        ORACLE[("Oracle Cloud Autonomous DB 26ai<br/>mTLS Wallet · 3 Esquemas Dedicados")]
+        MONGO[("MongoDB Atlas<br/>el_volcan_db · TZ America/Santiago")]
     end
 
     SPA -->|REST / HTTP| GW
     GW <-->|Registro / Heartbeat| EUR
-    GW --> AUTH & USU & INV & CAT & VEN & PAG
+    GW --> USU & INV & PAG & AUTH & CAT & VEN
 
     AUTH -. OpenFeign .-> USU
     CAT -. OpenFeign .-> INV
     VEN -. OpenFeign .-> INV & CAT
     PAG -. OpenFeign .-> VEN
 
-    AUTH & USU & INV & CAT & VEN & PAG --> MONGO
+    USU & INV & PAG --> ORACLE
+    AUTH & CAT & VEN --> MONGO
 ```
 
 ---
 
 ## 🛠️ Tecnologías Utilizadas
 
-### 🔹 Backend & Microservicios
+### 🔹 Backend & Persistencia Políglota
 - **Java 17 & Spring Boot 3.4.0** con **Spring Boot Actuator** (`/actuator/health`) en los 8 servicios.
 - **Spring Cloud 2024.0.0**: **Netflix Eureka Server**, **Spring Cloud Gateway MVC**, **OpenFeign** y **Spring Cloud LoadBalancer**.
-- **Seguridad**: **JJWT 0.12.6** (tokens firmados con claims de perfil completos y revocación en logout/cambio de clave) y **BCrypt** (`Spring Security Crypto`).
-- **Persistencia**: **Spring Data MongoDB** con conversores explícitos para **`America/Santiago`** e índices geoespaciales `2dsphere`.
+- **Persistencia Relacional (Oracle Cloud ADB 26ai)**: **Spring Data JPA**, **ojdbc11 + oraclepki (mTLS Wallet)** y **Flyway** en `ms-usuario` (`ELVOLCAN_USUARIO`), `ms-inventario` (`ELVOLCAN_INVENTARIO` con `@Version`, bloqueo pesimista `FOR UPDATE` y FK real) y `ms-pago` (`ELVOLCAN_PAGO` con `NUMBER(12,2)` / `BigDecimal`).
+- **Persistencia Documental (MongoDB Atlas)**: **Spring Data MongoDB** en `ms-catalogo`, `ms-venta` (pedidos embebidos, alertas en ruta e índices `2dsphere`) y `ms-auth` (sesiones JWT con índice TTL automático).
+- **Seguridad**: **JJWT 0.12.6** (tokens firmados y revocación en logout/cambio de clave), **BCrypt** (`Spring Security Crypto`) y Wallet OCI excluida de Git vía `.gitignore`.
 - **Herramientas**: **MapStruct 1.5.5**, **Lombok 1.18.34**, **Springdoc OpenAPI 2.8.0 (Swagger UI)** y **Maven Wrapper (`mvnw`)**.
 
 ### 🔹 Frontend Moderno (SPA)

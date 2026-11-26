@@ -59,6 +59,7 @@ public class SesionAuth {
     @Field("fecha_inicio")
     private LocalDateTime fechaInicio;
 
+    @Indexed(name = "idx_sesion_ttl", expireAfter = "0s")
     @Field("fecha_expiracion")
     private LocalDateTime fechaExpiracion;
 

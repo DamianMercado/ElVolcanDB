@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,7 @@ public class UsuarioService {
         return usuarioMapper.toResponseList(usuarioRepository.findByRol(rol));
     }
 
+    @Transactional
     public UsuarioResponse crear(UsuarioRequest request) {
         String emailNormalizado = normalizarEmail(request.getEmail());
         String rutLimpio = request.getRut() != null ? request.getRut().trim() : "";
@@ -103,7 +105,7 @@ public class UsuarioService {
 
         Usuario usuario = usuarioMapper.toEntity(request);
         usuario.setEmail(emailNormalizado);
-        usuario.setRut(rutLimpio);
+        usuario.setRut(rutLimpio.isBlank() ? null : rutLimpio);
         usuario.setPassword(passwordEncoder.encode(request.getPassword()));
         if (usuario.getActivo() == null) {
             usuario.setActivo(true);
@@ -117,6 +119,7 @@ public class UsuarioService {
         return usuarioMapper.toResponse(guardado);
     }
 
+    @Transactional
     public UsuarioResponse actualizar(Long id, UsuarioRequest request) {
         log.info("Actualizando usuario con ID: {}", id);
 
@@ -140,6 +143,7 @@ public class UsuarioService {
         return usuarioMapper.toResponse(actualizado);
     }
 
+    @Transactional
     public void eliminar(Long id) {
         log.info("Eliminando usuario con ID: {}", id);
         Usuario usuario = usuarioRepository.findById(id)
@@ -147,6 +151,7 @@ public class UsuarioService {
         usuarioRepository.delete(usuario);
     }
 
+    @Transactional
     public UsuarioResponse validarCredenciales(CredencialesRequest request) {
         String emailNormalizado = normalizarEmail(request.getEmail());
         log.info("Validando credenciales para email: {}", emailNormalizado);
@@ -172,6 +177,7 @@ public class UsuarioService {
         return usuarioMapper.toResponse(usuario);
     }
 
+    @Transactional
     public UsuarioResponse actualizarPasswordPorEmail(CredencialesRequest request) {
         String emailNormalizado = normalizarEmail(request.getEmail());
         log.info("Restableciendo contraseña para email: {}", emailNormalizado);
